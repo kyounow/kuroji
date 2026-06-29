@@ -169,6 +169,39 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     )
   })
 
+  it('信用枠を超える借入はキャップされる（D格付けは借入凍結）', () => {
+    const { initialState, params } = getScenario('default')
+    // 資産1,000万 = 負債900万 + 純資産100万（自己資本比率0.1→D）。恒等式を満たす弱い状態。
+    const weak: CompanyState = {
+      ...initialState,
+      balanceSheet: {
+        ...initialState.balanceSheet,
+        nonCurrentLiabilities: { longTermDebt: 9_000_000 },
+        equity: { capitalStock: 5_000_000, retainedEarnings: -4_000_000 },
+      },
+    }
+    expect(balances(weak.balanceSheet)).toBe(true)
+    const r = resolveTurn(weak, decide({ financing: 5_000_000 }), params)
+    expect(r.creditGrade).toBe('D')
+    expect(r.appliedFinancing).toBe(0)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('信用力が低いほど実効金利が高い', () => {
+    const { initialState, params } = getScenario('default')
+    const strong = resolveTurn(initialState, decide(), params).effectiveInterestRate
+    const weakState: CompanyState = {
+      ...initialState,
+      balanceSheet: {
+        ...initialState.balanceSheet,
+        nonCurrentLiabilities: { longTermDebt: 9_000_000 },
+        equity: { capitalStock: 5_000_000, retainedEarnings: -4_000_000 },
+      },
+    }
+    const weak = resolveTurn(weakState, decide(), params).effectiveInterestRate
+    expect(weak).toBeGreaterThan(strong)
+  })
+
   it('明示パラメータで損益が手計算と一致する', () => {
     // 期首: 現金 1,000,000 / 原材料 0 / 製品 1,000個=1,000,000 / 設備 1,000,000
     //       長期借入 500,000 / 資本金 1,000,000 / 利益剰余金 1,500,000

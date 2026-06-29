@@ -9,6 +9,7 @@ import type {
 } from '@core/types'
 import { demandAt } from '@core/market/demand'
 import { productFromRd } from '@core/product/research'
+import { assessCredit } from '@core/finance/credit'
 
 /** 販促費から需要乗数を求める（逓減効果、上限あり）。 */
 export function marketingMultiplier(spend: number, params: SimParams): number {
@@ -98,9 +99,11 @@ export function resolveTurn(
   const operatingExpenses = params.fixedCosts + depreciation + marketingSpend + rdSpend
   const operatingIncome = grossProfit - operatingExpenses
 
-  const interestBearingDebt =
-    bs.currentLiabilities.shortTermDebt + bs.nonCurrentLiabilities.longTermDebt
-  const interestExpense = Math.round(interestBearingDebt * params.interestRate)
+  // 信用力に応じて金利スプレッドが乗る（期首の財務状態で評価）。
+  const credit = assessCredit(state)
+  const effectiveInterestRate = params.interestRate + credit.spread
+  const debt = bs.currentLiabilities.shortTermDebt + bs.nonCurrentLiabilities.longTermDebt
+  const interestExpense = Math.round(debt * effectiveInterestRate)
   const pretaxIncome = operatingIncome - interestExpense
 
   const tax = pretaxIncome > 0 ? Math.round(pretaxIncome * params.effectiveTaxRate) : 0
@@ -127,9 +130,14 @@ export function resolveTurn(
   const deltaAP = apEnd - apBegin
 
   // --- キャッシュ・フロー計算書（間接法・整合保証） ---
+  // 資金調達は信用枠でキャップ（借入は borrowLimit まで、返済は残債まで）。
+  const financing =
+    decision.financing > 0
+      ? Math.min(decision.financing, credit.borrowLimit)
+      : Math.max(decision.financing, -bs.nonCurrentLiabilities.longTermDebt)
+
   const operating = netIncome + depreciation - deltaAR - deltaInventory + deltaAP
   const investing = -decision.capitalExpenditure
-  const financing = decision.financing
   const netChange = operating + investing + financing
   const cashEnd = cashBegin + netChange
 
@@ -164,7 +172,7 @@ export function resolveTurn(
         shortTermDebt: bs.currentLiabilities.shortTermDebt,
       },
       nonCurrentLiabilities: {
-        longTermDebt: bs.nonCurrentLiabilities.longTermDebt + decision.financing,
+        longTermDebt: bs.nonCurrentLiabilities.longTermDebt + financing,
       },
       equity: {
         capitalStock: bs.equity.capitalStock,
@@ -183,5 +191,8 @@ export function resolveTurn(
     deltaAR,
     deltaInventory,
     deltaAP,
+    creditGrade: credit.grade,
+    effectiveInterestRate,
+    appliedFinancing: financing,
   }
 }

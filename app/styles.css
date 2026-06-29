@@ -203,6 +203,31 @@ h2 {
   color: var(--muted);
 }
 
+/* 信用格付け */
+.credit-grade {
+  font-weight: 800;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.grade-AAA,
+.grade-A {
+  color: #fff;
+  background: var(--good);
+}
+.grade-B {
+  color: #fff;
+  background: var(--accent-2);
+}
+.grade-C {
+  color: #fff;
+  background: #d08a1e;
+}
+.grade-D {
+  color: #fff;
+  background: var(--bad);
+}
+
 /* シナリオ選択 */
 .scenario-select {
   display: inline-flex;

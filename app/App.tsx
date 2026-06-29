@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Decision } from '@core/index'
-import { totalEquity, productFromRd, scoreGame } from '@core/index'
+import { totalEquity, productFromRd, scoreGame, assessCredit } from '@core/index'
 import { useGame } from './state'
 import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
@@ -81,6 +81,10 @@ export function App() {
     scenario.params.unitVariableCost * game.current.materialIndex * product.unitCostModifier,
   )
 
+  // 信用力（格付け・実効金利・借入枠）。期首の財務状態で評価。
+  const credit = assessCredit(game.current)
+  const effectiveRate = scenario.params.interestRate + credit.spread
+
   return (
     <main className="app">
       <header>
@@ -104,6 +108,11 @@ export function App() {
           <span className={equity - startEquity >= 0 ? 'ok' : 'ng'}>
             （開始比 {yenSigned(equity - startEquity)}）
           </span>
+        </div>
+        <div>
+          <span className="muted small">信用格付</span>{' '}
+          <span className={`credit-grade grade-${credit.grade}`}>{credit.grade}</span>{' '}
+          <span className="muted small">金利 {pct(effectiveRate)}</span>
         </div>
         <label className="scenario-select">
           <span className="muted small">シナリオ</span>
@@ -198,6 +207,9 @@ export function App() {
         disabled={gameOver}
         materialUnitCost={spotCost}
         enabled={scenario.enabledDecisions}
+        creditGrade={credit.grade}
+        borrowLimit={credit.borrowLimit}
+        effectiveRate={effectiveRate}
       />
 
       <HistoryTable

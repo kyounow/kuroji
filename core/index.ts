@@ -18,6 +18,7 @@ export type {
 export { totalAssets, totalLiabilities, totalEquity, balances } from './statements/identity'
 export { demandAt } from './market/demand'
 export { computeRatios } from './finance/ratios'
+export { assessCredit, type CreditInfo, type CreditGrade } from './finance/credit'
 export { productFromRd } from './product/research'
 export { materialIndexNext } from './market/material'
 export { evaluateGoal } from './goals/evaluateGoal'

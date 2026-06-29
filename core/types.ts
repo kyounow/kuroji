@@ -142,6 +142,12 @@ export interface TurnResult {
   deltaAR: number
   deltaInventory: number
   deltaAP: number
+  /** 当期に適用された信用格付け */
+  creditGrade: string
+  /** 当期に適用された実効金利（基準金利＋スプレッド） */
+  effectiveInterestRate: number
+  /** 当期に実際に適用された資金調達額（借入枠でキャップ後） */
+  appliedFinancing: number
 }
 
 /**

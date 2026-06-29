@@ -1,6 +1,6 @@
 import type { Decision } from '@core/index'
 import type { DecisionField } from '@data/scenarios'
-import { yen } from '../format'
+import { yen, pct } from '../format'
 
 interface Props {
   decision: Decision
@@ -12,6 +12,12 @@ interface Props {
   materialUnitCost: number
   /** 操作可能な判断フィールド（未指定なら全て） */
   enabled?: readonly DecisionField[]
+  /** 信用格付け（借入欄の表示用） */
+  creditGrade: string
+  /** 当期の借入上限 */
+  borrowLimit: number
+  /** 実効金利 */
+  effectiveRate: number
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -78,9 +84,18 @@ export function DecisionPanel({
   disabled,
   materialUnitCost,
   enabled,
+  creditGrade,
+  borrowLimit,
+  effectiveRate,
 }: Props) {
   const purchaseCost = materialUnitCost * Math.max(0, decision.purchaseMaterials)
   const visible = FIELDS.filter((f) => !enabled || enabled.includes(f.key))
+
+  const hintFor = (f: FieldDef): string => {
+    if (f.key === 'purchaseMaterials') return `単価 ${yen(materialUnitCost)}/個 → 仕入額 ${yen(purchaseCost)}`
+    if (f.key === 'financing') return `格付${creditGrade}・借入上限 ${yen(borrowLimit)}・金利 ${pct(effectiveRate)}`
+    return f.hint
+  }
 
   return (
     <section className="panel">
@@ -97,11 +112,7 @@ export function DecisionPanel({
             onChange={(v) => onChange({ [f.key]: v })}
             step={f.step}
             min={f.min}
-            hint={
-              f.key === 'purchaseMaterials'
-                ? `単価 ${yen(materialUnitCost)}/個 → 仕入額 ${yen(purchaseCost)}`
-                : f.hint
-            }
+            hint={hintFor(f)}
           />
         ))}
       </div>
