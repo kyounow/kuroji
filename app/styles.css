@@ -123,13 +123,79 @@ h2 {
   color: var(--muted);
 }
 
-/* 倒産 */
+/* 終了（勝敗） */
 .gameover {
   padding: 0.75rem 1rem;
   border: 1px solid var(--bad);
   border-radius: 8px;
   background: color-mix(in srgb, var(--bad) 12%, transparent);
   margin: 1rem 0;
+}
+
+.gameover.won {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 14%, transparent);
+}
+
+/* シナリオ選択 */
+.scenario-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.scenario-select select {
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* ゴール（勝利条件）＋進捗バー */
+.goal {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  margin: 1rem 0;
+  background: var(--panel);
+}
+
+.goal.won {
+  border-left-color: var(--good);
+}
+.goal.lost {
+  border-left-color: var(--bad);
+}
+
+.goal-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.goal-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--fg) 12%, transparent);
+  overflow: hidden;
+}
+
+.goal-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.goal.won .goal-fill {
+  background: var(--good);
+}
+.goal.lost .goal-fill {
+  background: var(--bad);
 }
 
 /* パネル */

@@ -11,7 +11,8 @@ import { HistoryChart } from './components/HistoryChart'
 import { yen, yenSigned, pct, num } from './format'
 
 export function App() {
-  const { game, scenario, play, reset, upcomingEvent } = useGame()
+  const { game, scenario, play, reset, selectScenario, scenarios, upcomingEvent } = useGame()
+  const gameOver = game.outcome !== 'playing'
 
   const [decision, setDecision] = useState<Decision>({
     unitPrice: scenario.params.basePrice,
@@ -55,6 +56,9 @@ export function App() {
         <div>
           <span className="status-num">第 {game.current.turn + 1} 期</span>
           <span className="muted">の経営判断</span>
+          {scenario.turnLimit && (
+            <span className="muted small">（全{scenario.turnLimit}期）</span>
+          )}
         </div>
         <div>
           <span className="muted">純資産</span> <span className="status-num">{yen(equity)}</span>{' '}
@@ -62,12 +66,50 @@ export function App() {
             （開始比 {yenSigned(equity - startEquity)}）
           </span>
         </div>
+        <label className="scenario-select">
+          <span className="muted small">シナリオ</span>
+          <select
+            value={game.scenarioId}
+            onChange={(e) => selectScenario(e.target.value)}
+          >
+            {scenarios.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
 
-      {game.gameOver && (
-        <div className="gameover">
-          <strong>倒産しました。</strong> 現金がマイナス、または債務超過になりました。
-          「最初からやり直す」で再挑戦できます。
+      {game.goalStatus && (
+        <section className={`goal ${game.goalStatus.status}`}>
+          <div className="goal-head">
+            <strong>🎯 目標: {game.goalStatus.label}</strong>
+            <span className="muted small">{game.goalStatus.detail}</span>
+          </div>
+          <div className="goal-bar">
+            <div
+              className="goal-fill"
+              style={{ width: `${Math.round(game.goalStatus.progress * 100)}%` }}
+            />
+          </div>
+        </section>
+      )}
+
+      {gameOver && (
+        <div className={`gameover ${game.outcome}`}>
+          {game.outcome === 'won' ? (
+            <>
+              <strong>🎉 目標達成・クリア！</strong> {game.goalStatus?.detail}。
+              「最初からやり直す」で再挑戦、または別シナリオへ。
+            </>
+          ) : (
+            <>
+              <strong>💀 ゲームオーバー。</strong>{' '}
+              {game.goalStatus?.detail ?? '現金がマイナス、または債務超過になりました'}。
+              「最初からやり直す」で再挑戦できます。
+            </>
+          )}
         </div>
       )}
 
@@ -112,7 +154,7 @@ export function App() {
         onChange={patch}
         onPlay={() => play(decision)}
         onReset={reset}
-        disabled={game.gameOver}
+        disabled={gameOver}
         materialUnitCost={spotCost}
       />
 

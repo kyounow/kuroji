@@ -196,6 +196,28 @@ export interface SimParams {
   effectiveTaxRate: number
 }
 
+/**
+ * シナリオの勝利条件（ゴール）。未設定ならフリープレイ（倒産だけが負け）。
+ * - equityTarget: 期限内に純資産を target 以上にする
+ * - repayAll: 期限内に有利子負債を完済する
+ * - survive: turns 期を倒産せず生き延びる
+ */
+export type Goal =
+  | { kind: 'equityTarget'; label: string; target: number; withinTurns: number }
+  | { kind: 'repayAll'; label: string; withinTurns: number }
+  | { kind: 'survive'; label: string; turns: number }
+
+/** ゴールの達成状況。 */
+export interface GoalStatus {
+  status: 'progress' | 'won' | 'lost'
+  /** 進捗 0..1（表示用） */
+  progress: number
+  /** ゴールの表示名 */
+  label: string
+  /** 現状の補足（例: 純資産 ¥X / 目標 ¥Y、残りN期） */
+  detail: string
+}
+
 /** 主要な経営指標（Phase 1 で計算関数を実装）。 */
 export interface Ratios {
   currentRatio: number // 流動比率

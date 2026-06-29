@@ -65,4 +65,11 @@ export const defaultScenario: Scenario = {
     interestRate: 0.03,
     effectiveTaxRate: 0.3,
   },
+  turnLimit: 12,
+  goal: {
+    kind: 'equityTarget',
+    label: '12期以内に純資産を 1,000万円に',
+    target: 10_000_000,
+    withinTurns: 12,
+  },
 }

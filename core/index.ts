@@ -11,6 +11,8 @@ export type {
   TurnOptions,
   MarketEvent,
   ProductState,
+  Goal,
+  GoalStatus,
 } from './types'
 
 export { totalAssets, totalLiabilities, totalEquity, balances } from './statements/identity'
@@ -18,6 +20,7 @@ export { demandAt } from './market/demand'
 export { computeRatios } from './finance/ratios'
 export { productFromRd } from './product/research'
 export { materialIndexNext } from './market/material'
+export { evaluateGoal } from './goals/evaluateGoal'
 export { resolveTurn, marketingMultiplier } from './engine/resolveTurn'
 export { drawEvent } from './engine/events'
 export { createRng, hashUnit } from './util/rng'

@@ -1,6 +1,6 @@
-import type { CompanyState, SimParams } from '@core/types'
+import type { CompanyState, SimParams, Goal } from '@core/types'
 
-// SimParams はドメイン（core）が定義する計算入力。シナリオはその具体値を供給する。
+// SimParams/Goal はドメイン（core）が定義する。シナリオはその具体値を供給する。
 export type { SimParams } from '@core/types'
 
 /**
@@ -17,4 +17,22 @@ export interface Scenario {
   initialState: CompanyState
   /** シミュレーションのパラメータ（需要・コスト・財務・税） */
   params: SimParams
+  /** 使用する市況イベントテーブル ID（未指定は 'default'） */
+  eventTableId?: string
+  /** 勝利条件（未指定はフリープレイ） */
+  goal?: Goal
+  /** 固定期数（この期で終了しスコア確定。未指定は無制限） */
+  turnLimit?: number
+  /** 操作可能にする判断フィールド（チュートリアル用。未指定は全て可） */
+  enabledDecisions?: DecisionField[]
 }
+
+/** 判断フィールドの識別子（チュートリアルの段階開放に使用）。 */
+export type DecisionField =
+  | 'unitPrice'
+  | 'purchaseMaterials'
+  | 'produceUnits'
+  | 'marketingSpend'
+  | 'rdSpend'
+  | 'capitalExpenditure'
+  | 'financing'
