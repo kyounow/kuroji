@@ -27,12 +27,18 @@
   box-sizing: border-box;
 }
 
+/* 三表の全幅化（100vw bleed）で出る僅かな横スクロールを抑止（スクロール元は html） */
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
   color: var(--fg);
   background: var(--bg);
   line-height: 1.6;
+  overflow-x: hidden;
 }
 
 .app {
@@ -229,6 +235,65 @@ button.ghost {
   gap: 1rem;
 }
 
+/* 三表は画面幅いっぱいに広げて図を大きく見せる（操作系は 1000px のまま） */
+.statements-bleed {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  margin-left: -50vw;
+}
+
+.statements-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+/* 「3つ並べて」モードは広い領域があるので最小幅を大きめに */
+.grid-statements {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+}
+
+/* 「1つずつ大きく」モードのカード */
+.card-big {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.card-big h3 {
+  font-size: 1.1rem;
+}
+
+/* 三表の上部コントロール */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0.85rem;
+}
+
+.tabs button {
+  font: inherit;
+  padding: 0.45rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.tabs button.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 .card {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -375,6 +440,13 @@ table.history tbody tr.selected {
   border-radius: 8px;
 }
 
+/* B/S の積み上げ棒は横に広げすぎない（縦に間延びさせない） */
+.chart-bs {
+  max-width: 460px;
+  margin: 0 auto;
+  display: block;
+}
+
 /* ウォーターフォール */
 .wf-total {
   fill: var(--accent-2);
@@ -387,12 +459,12 @@ table.history tbody tr.selected {
 }
 .wf-value {
   fill: var(--fg);
-  font-size: 10px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .wf-label {
   fill: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 /* B/S 凡例 */

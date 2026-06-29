@@ -77,7 +77,7 @@ export function BalanceSheetChart({ bs }: { bs: BalanceSheet }) {
 
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label="貸借対照表グラフ">
+      <svg viewBox={`0 0 ${W} ${H}`} className="chart chart-bs" role="img" aria-label="貸借対照表グラフ">
         <line x1={8} y1={zeroY} x2={W - 8} y2={zeroY} className="axis-zero" />
         {renderBar(assets, x1, '資産')}
         {renderBar(liabEquity, x2, '負債+純資産')}
