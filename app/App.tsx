@@ -27,6 +27,20 @@ export function App() {
   })
   const patch = (p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p }))
 
+  // シナリオを切り替えたら判断の初期値もそのシナリオ向けに戻す。
+  useEffect(() => {
+    setDecision({
+      unitPrice: scenario.params.basePrice,
+      purchaseMaterials: scenario.params.baseDemand,
+      produceUnits: scenario.params.baseDemand,
+      marketingSpend: 0,
+      rdSpend: 0,
+      capitalExpenditure: 0,
+      financing: 0,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.scenarioId])
+
   // 表示中の期（既定は最新。過去の期をクリックすると切り替わる）。
   const [selectedTurn, setSelectedTurn] = useState(0)
   useEffect(() => {
@@ -183,6 +197,7 @@ export function App() {
         onReset={reset}
         disabled={gameOver}
         materialUnitCost={spotCost}
+        enabled={scenario.enabledDecisions}
       />
 
       <HistoryTable

@@ -1,4 +1,5 @@
 import type { Decision } from '@core/index'
+import type { DecisionField } from '@data/scenarios'
 import { yen } from '../format'
 
 interface Props {
@@ -9,6 +10,8 @@ interface Props {
   disabled: boolean
   /** 当期の原材料スポット単価（仕入の単価表示に使用） */
   materialUnitCost: number
+  /** 操作可能な判断フィールド（未指定なら全て） */
+  enabled?: readonly DecisionField[]
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -16,14 +19,14 @@ function Field({
   label,
   value,
   onChange,
-  step = 100,
+  step,
   min = 0,
   hint,
 }: {
   label: string
   value: number
   onChange: (v: number) => void
-  step?: number
+  step: number
   min?: number
   hint?: string
 }) {
@@ -42,63 +45,65 @@ function Field({
   )
 }
 
+interface FieldDef {
+  key: DecisionField
+  label: string
+  step: number
+  min?: number
+  hint: string
+}
+
+const FIELDS: readonly FieldDef[] = [
+  { key: 'unitPrice', label: '販売価格（単価）', step: 100, hint: '上げると利益率↑だが数量↓' },
+  { key: 'purchaseMaterials', label: '原材料の仕入数量', step: 50, hint: '' }, // hint は動的
+  { key: 'produceUnits', label: '生産数量', step: 50, hint: '手持ち原材料が上限' },
+  { key: 'marketingSpend', label: '販促費', step: 50_000, hint: '需要を押し上げる（逓減）' },
+  { key: 'rdSpend', label: '研究開発費（R&D）', step: 50_000, hint: '累積で原価↓・需要↑（翌期以降）' },
+  { key: 'capitalExpenditure', label: '設備投資', step: 100_000, hint: '固定資産↑・現金↓' },
+  {
+    key: 'financing',
+    label: '資金調達（借入＋／返済−）',
+    step: 100_000,
+    min: -100_000_000,
+    hint: '借入は利息が発生',
+  },
+]
+
 /** 経営判断の入力パネル。 */
-export function DecisionPanel({ decision, onChange, onPlay, onReset, disabled, materialUnitCost }: Props) {
+export function DecisionPanel({
+  decision,
+  onChange,
+  onPlay,
+  onReset,
+  disabled,
+  materialUnitCost,
+  enabled,
+}: Props) {
   const purchaseCost = materialUnitCost * Math.max(0, decision.purchaseMaterials)
+  const visible = FIELDS.filter((f) => !enabled || enabled.includes(f.key))
+
   return (
     <section className="panel">
       <h2>経営判断</h2>
+      {enabled && (
+        <p className="muted small">このシナリオでは一部の判断のみ操作できます（段階的に解禁）。</p>
+      )}
       <div className="fields">
-        <Field
-          label="販売価格（単価）"
-          value={decision.unitPrice}
-          onChange={(v) => onChange({ unitPrice: v })}
-          step={100}
-          hint="上げると利益率↑だが数量↓"
-        />
-        <Field
-          label="原材料の仕入数量"
-          value={decision.purchaseMaterials}
-          onChange={(v) => onChange({ purchaseMaterials: v })}
-          step={50}
-          hint={`単価 ${yen(materialUnitCost)}/個 → 仕入額 ${yen(purchaseCost)}`}
-        />
-        <Field
-          label="生産数量"
-          value={decision.produceUnits}
-          onChange={(v) => onChange({ produceUnits: v })}
-          step={50}
-          hint="手持ち原材料が上限"
-        />
-        <Field
-          label="販促費"
-          value={decision.marketingSpend}
-          onChange={(v) => onChange({ marketingSpend: v })}
-          step={50_000}
-          hint="需要を押し上げる（逓減）"
-        />
-        <Field
-          label="研究開発費（R&D）"
-          value={decision.rdSpend}
-          onChange={(v) => onChange({ rdSpend: v })}
-          step={50_000}
-          hint="累積で原価↓・需要↑（翌期以降）"
-        />
-        <Field
-          label="設備投資"
-          value={decision.capitalExpenditure}
-          onChange={(v) => onChange({ capitalExpenditure: v })}
-          step={100_000}
-          hint="固定資産↑・現金↓"
-        />
-        <Field
-          label="資金調達（借入＋／返済−）"
-          value={decision.financing}
-          onChange={(v) => onChange({ financing: v })}
-          step={100_000}
-          min={-100_000_000}
-          hint="借入は利息が発生"
-        />
+        {visible.map((f) => (
+          <Field
+            key={f.key}
+            label={f.label}
+            value={decision[f.key]}
+            onChange={(v) => onChange({ [f.key]: v })}
+            step={f.step}
+            min={f.min}
+            hint={
+              f.key === 'purchaseMaterials'
+                ? `単価 ${yen(materialUnitCost)}/個 → 仕入額 ${yen(purchaseCost)}`
+                : f.hint
+            }
+          />
+        ))}
       </div>
       <div className="actions">
         <button onClick={onPlay} disabled={disabled}>
