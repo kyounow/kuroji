@@ -1,0 +1,2 @@
+# リポジトリ内の改行は LF に正規化（CI は Linux で動くため差分ノイズを防ぐ）
+* text=auto eol=lf
