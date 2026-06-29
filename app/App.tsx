@@ -1,123 +1,79 @@
-import { useMemo, useState } from 'react'
-import {
-  resolveTurn,
-  computeRatios,
-  balances,
-  totalAssets,
-  totalLiabilities,
-  totalEquity,
-  type CompanyState,
-} from '@core/index'
-import { getScenario } from '@data/scenarios'
-
-const yen = (n: number) => `¥${Math.round(n).toLocaleString('ja-JP')}`
-const pct = (n: number) => (Number.isFinite(n) ? `${(n * 100).toFixed(1)}%` : '—')
-const ratio = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : '∞')
-
-const scenario = getScenario('default')
+import { useState } from 'react'
+import type { Decision } from '@core/index'
+import { totalEquity } from '@core/index'
+import { useGame } from './state'
+import { EventBanner } from './components/EventBanner'
+import { DecisionPanel } from './components/DecisionPanel'
+import { StatementsView } from './components/StatementsView'
+import { RatiosView } from './components/RatiosView'
+import { HistoryChart } from './components/HistoryChart'
+import { yen, yenSigned } from './format'
 
 export function App() {
-  const [state, setState] = useState<CompanyState>(scenario.initialState)
-  const [unitPrice, setUnitPrice] = useState(scenario.params.basePrice)
+  const { game, scenario, play, reset, upcomingEvent } = useGame()
 
-  // 直近ターンの結果プレビュー（この価格で1期回したらどうなるか）。
-  const preview = useMemo(
-    () => resolveTurn(state, { capitalExpenditure: 0, unitPrice, financing: 0 }, scenario.params),
-    [state, unitPrice],
-  )
-  const pl = preview.incomeStatement
-  const ratios = computeRatios(preview.state.balanceSheet, pl)
-  const bs = state.balanceSheet
+  const [decision, setDecision] = useState<Decision>({
+    unitPrice: scenario.params.basePrice,
+    produceUnits: scenario.params.baseDemand,
+    marketingSpend: 0,
+    capitalExpenditure: 0,
+    financing: 0,
+  })
+  const patch = (p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p }))
 
-  const advance = () => setState(preview.state)
-  const reset = () => {
-    setState(scenario.initialState)
-    setUnitPrice(scenario.params.basePrice)
-  }
+  const last = game.history.length ? game.history[game.history.length - 1] : null
+  const equity = totalEquity(game.current.balanceSheet)
+  const startEquity = totalEquity(scenario.initialState.balanceSheet)
 
   return (
     <main className="app">
       <header>
         <h1>kuroji — 会計で学ぶ経営シミュレーション</h1>
         <p className="lead">
-          価格を決めて1期を回すと、損益計算書・貸借対照表・キャッシュフローがどう動くかが分かります。
-          <br />
-          <small>※ Phase 1（会計エンジン）実装中。経営判断は価格のみ（投資・資金調達は今後追加）。</small>
+          価格・生産・販促・投資・資金調達を決めて1期ずつ経営し、財務三表の動きを見ながら
+          <strong>純資産（黒字）を増やす</strong>のが目標です。
         </p>
       </header>
 
-      <section className="panel">
-        <div className="row">
-          <strong>第 {state.turn + 1} 期</strong>
-          <label>
-            販売価格: {yen(unitPrice)}
-            <input
-              type="range"
-              min={500}
-              max={5000}
-              step={100}
-              value={unitPrice}
-              onChange={(e) => setUnitPrice(Number(e.target.value))}
-            />
-          </label>
-          <span>想定販売数量: {preview.unitsSold.toLocaleString('ja-JP')} 個</span>
+      <section className="status">
+        <div>
+          <span className="status-num">第 {game.current.turn + 1} 期</span>
+          <span className="muted">の経営判断</span>
         </div>
-        <div className="row">
-          <button onClick={advance}>この価格で1期すすめる ▶</button>
-          <button className="ghost" onClick={reset}>
-            最初からやり直す
-          </button>
+        <div>
+          <span className="muted">純資産</span> <span className="status-num">{yen(equity)}</span>{' '}
+          <span className={equity - startEquity >= 0 ? 'ok' : 'ng'}>
+            （開始比 {yenSigned(equity - startEquity)}）
+          </span>
         </div>
       </section>
 
-      <section className="grid">
-        <div className="card">
-          <h3>損益計算書（P/L）今期見込み</h3>
-          <table>
-            <tbody>
-              <tr><th>売上高</th><td>{yen(pl.revenue)}</td></tr>
-              <tr><th>売上原価</th><td>{yen(pl.costOfGoodsSold)}</td></tr>
-              <tr className="sub"><th>売上総利益</th><td>{yen(pl.grossProfit)}</td></tr>
-              <tr><th>販管費（含 減価償却）</th><td>{yen(pl.operatingExpenses)}</td></tr>
-              <tr className="sub"><th>営業利益</th><td>{yen(pl.operatingIncome)}</td></tr>
-              <tr><th>支払利息</th><td>{yen(pl.interestExpense)}</td></tr>
-              <tr><th>法人税等</th><td>{yen(pl.tax)}</td></tr>
-              <tr className={pl.netIncome >= 0 ? 'total ok' : 'total ng'}>
-                <th>当期純利益</th><td>{yen(pl.netIncome)}</td>
-              </tr>
-            </tbody>
-          </table>
+      {game.gameOver && (
+        <div className="gameover">
+          <strong>倒産しました。</strong> 現金がマイナス、または債務超過になりました。
+          「最初からやり直す」で再挑戦できます。
         </div>
+      )}
 
-        <div className="card">
-          <h3>貸借対照表（B/S）期首</h3>
-          <table>
-            <tbody>
-              <tr><th>資産合計</th><td>{yen(totalAssets(bs))}</td></tr>
-              <tr><th>　うち現金</th><td>{yen(bs.currentAssets.cash)}</td></tr>
-              <tr><th>負債合計</th><td>{yen(totalLiabilities(bs))}</td></tr>
-              <tr><th>純資産合計</th><td>{yen(totalEquity(bs))}</td></tr>
-            </tbody>
-          </table>
-          <p className={balances(bs) ? 'ok' : 'ng'}>
-            会計恒等式: {balances(bs) ? '✓ 成立' : '✗ 崩れ'}
-          </p>
-        </div>
+      <EventBanner event={upcomingEvent} />
 
-        <div className="card">
-          <h3>経営指標（今期末見込み）</h3>
-          <table>
-            <tbody>
-              <tr><th>流動比率</th><td>{ratio(ratios.currentRatio)}</td></tr>
-              <tr><th>自己資本比率</th><td>{pct(ratios.equityRatio)}</td></tr>
-              <tr><th>ROE</th><td>{pct(ratios.roe)}</td></tr>
-              <tr><th>ROA</th><td>{pct(ratios.roa)}</td></tr>
-              <tr><th>売上総利益率</th><td>{pct(ratios.grossMargin)}</td></tr>
-              <tr><th>営業利益率</th><td>{pct(ratios.operatingMargin)}</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <DecisionPanel
+        decision={decision}
+        onChange={patch}
+        onPlay={() => play(decision)}
+        onReset={reset}
+        disabled={game.gameOver}
+      />
+
+      <RatiosView ratios={last ? last.ratios : null} />
+
+      <StatementsView state={game.current} last={last} />
+
+      <HistoryChart initial={scenario.initialState} history={game.history} />
+
+      <footer className="muted small">
+        ※ 学習用の簡略モデルです。会計実務や実在企業の財務再現ではありません。
+      </footer>
     </main>
   )
 }

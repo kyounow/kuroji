@@ -4,46 +4,74 @@ import type {
   IncomeStatement,
   CashFlowStatement,
   SimParams,
+  TurnOptions,
   TurnResult,
 } from '@core/types'
 import { demandAt } from '@core/market/demand'
 
+/** 販促費から需要乗数を求める（逓減効果、上限あり）。 */
+export function marketingMultiplier(spend: number, params: SimParams): number {
+  if (spend <= 0) return 1
+  return 1 + params.marketingEffect * (spend / (spend + params.marketingHalf))
+}
+
 /**
- * 1ターン（1会計期間）を解決する純粋関数。
- * 入力（期首状態・経営判断・パラメータ）から損益計算書・貸借対照表・
- * キャッシュ・フロー計算書を計算し、次の状態を返す。
+ * 1ターン（1会計期間）を解決する純粋関数。発生主義の簡易モデル。
  *
- * Phase 1 の簡略前提:
- *   - 売掛金・買掛金は使わず、売上・仕入・販管費・税はすべて当期現金決済。
- *   - 在庫は需要分を当期生産・販売し、在庫残高は不変（仕入＝売上原価）。
- * これにより「営業 CF = 当期純利益 ＋ 減価償却」が成立し、
- * 期末の会計恒等式（資産 = 負債 + 純資産）が常に保たれる。
+ * モデルの要点（学習用に簡略化）:
+ *   - 在庫: 期首在庫＋当期生産のうち、需要分だけ販売。売れ残りは在庫として繰越。
+ *           売上原価は「販売数量 × 単価原価」（費用収益対応）。
+ *   - 売掛金: 当期売上の一部（salesOnCreditRatio）は期末に売掛金として残り、現金は翌期回収。
+ *             期首の売掛金は当期に現金回収する。
+ *   - 買掛金: 当期仕入（生産費）の一部（payableRatio）は期末に買掛金として残り、現金は翌期支払。
+ *             期首の買掛金は当期に現金支払する。
+ *   - 減価償却: 期首の固定資産簿価に対して計上（当期取得分は翌期から）。非現金。
+ *   - 在庫の評価単価は params.unitVariableCost で一定とみなす。
+ *
+ * これにより「営業 CF = 当期純利益 ＋ 減価償却 − ΔAR − Δ在庫 ＋ ΔAP」が成立し、
+ * 期末の会計恒等式（資産 = 負債 + 純資産）が常に保たれる（数値はすべて整数円）。
  */
 export function resolveTurn(
   state: CompanyState,
   decision: Decision,
   params: SimParams,
+  options: TurnOptions = {},
 ): TurnResult {
   const bs = state.balanceSheet
+  const unitCost = params.unitVariableCost
+
+  // 期首残高
+  const cashBegin = bs.currentAssets.cash
+  const arBegin = bs.currentAssets.accountsReceivable
+  const invBegin = bs.currentAssets.inventory
+  const apBegin = bs.currentLiabilities.accountsPayable
+  const invUnitsBegin = unitCost > 0 ? Math.round(invBegin / unitCost) : 0
+
+  // --- 需要と販売 ---
+  const demandMultiplier = options.demandMultiplier ?? 1
+  const rawDemand = demandAt(decision.unitPrice, params)
+  const demand = Math.max(
+    0,
+    Math.round(rawDemand * marketingMultiplier(decision.marketingSpend, params) * demandMultiplier),
+  )
+  const unitsAvailable = invUnitsBegin + Math.max(0, decision.produceUnits)
+  const unitsSold = Math.min(demand, unitsAvailable)
 
   // --- 損益計算書（P/L） ---
-  const unitsSold = demandAt(decision.unitPrice, params)
   const revenue = Math.round(decision.unitPrice * unitsSold)
-  const costOfGoodsSold = Math.round(params.unitVariableCost * unitsSold)
+  const costOfGoodsSold = unitCost * unitsSold
   const grossProfit = revenue - costOfGoodsSold
 
-  // 減価償却は期首の固定資産簿価に対して計上（当期取得分は翌期から）。
   const depreciation = Math.round(bs.fixedAssets.equipment * params.depreciationRate)
-  const operatingExpenses = params.fixedCosts + depreciation
+  const marketingSpend = Math.max(0, decision.marketingSpend)
+  const operatingExpenses = params.fixedCosts + depreciation + marketingSpend
   const operatingIncome = grossProfit - operatingExpenses
 
-  // 支払利息は期首の有利子負債に対して計上。
   const interestBearingDebt =
     bs.currentLiabilities.shortTermDebt + bs.nonCurrentLiabilities.longTermDebt
   const interestExpense = Math.round(interestBearingDebt * params.interestRate)
   const pretaxIncome = operatingIncome - interestExpense
 
-  // 法人税は黒字のときのみ（欠損金の繰越は Phase 2 以降）。
   const tax = pretaxIncome > 0 ? Math.round(pretaxIncome * params.effectiveTaxRate) : 0
   const netIncome = pretaxIncome - tax
 
@@ -59,16 +87,21 @@ export function resolveTurn(
     netIncome,
   }
 
-  // --- キャッシュ・フロー計算書（間接法） ---
-  // 営業: 当期純利益に非現金項目（減価償却）を足し戻す。
-  const operating = netIncome + depreciation
-  // 投資: 設備投資の支出。
+  // --- 期末の資産・負債（発生主義） ---
+  const productionCost = unitCost * Math.max(0, decision.produceUnits) // 当期仕入（在庫に積む）
+  const arEnd = Math.round(revenue * params.salesOnCreditRatio)
+  const apEnd = Math.round(productionCost * params.payableRatio)
+  const invEnd = invBegin + productionCost - costOfGoodsSold // 在庫の増減（生産 − 販売原価）
+
+  const deltaAR = arEnd - arBegin
+  const deltaInv = invEnd - invBegin
+  const deltaAP = apEnd - apBegin
+
+  // --- キャッシュ・フロー計算書（間接法・整合保証） ---
+  const operating = netIncome + depreciation - deltaAR - deltaInv + deltaAP
   const investing = -decision.capitalExpenditure
-  // 財務: 借入(+)／返済(−)。
   const financing = decision.financing
   const netChange = operating + investing + financing
-
-  const cashBegin = bs.currentAssets.cash
   const cashEnd = cashBegin + netChange
 
   const cashFlow: CashFlowStatement = {
@@ -86,19 +119,17 @@ export function resolveTurn(
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,
-        accountsReceivable: bs.currentAssets.accountsReceivable, // Phase 1 は不変
-        inventory: bs.currentAssets.inventory, // Phase 1 は不変
+        accountsReceivable: arEnd,
+        inventory: invEnd,
       },
       fixedAssets: {
-        // 期首簿価 − 減価償却 ＋ 当期設備投資
         equipment: bs.fixedAssets.equipment - depreciation + decision.capitalExpenditure,
       },
       currentLiabilities: {
-        accountsPayable: bs.currentLiabilities.accountsPayable, // Phase 1 は不変
-        shortTermDebt: bs.currentLiabilities.shortTermDebt, // Phase 1 は不変
+        accountsPayable: apEnd,
+        shortTermDebt: bs.currentLiabilities.shortTermDebt,
       },
       nonCurrentLiabilities: {
-        // 借入(+)／返済(−)は長期借入に反映
         longTermDebt: bs.nonCurrentLiabilities.longTermDebt + decision.financing,
       },
       equity: {

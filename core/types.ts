@@ -49,14 +49,35 @@ export interface CompanyState {
   balanceSheet: BalanceSheet
 }
 
-/** 1ターンの経営判断（Phase 2 で拡充）。 */
+/** 1ターンの経営判断。 */
 export interface Decision {
-  /** 設備投資額 */
-  capitalExpenditure: number
   /** 販売価格（単価） */
   unitPrice: number
+  /** 当期の生産（仕入）数量。売れ残りは在庫になる。 */
+  produceUnits: number
+  /** 販促費（需要を押し上げるが費用になる） */
+  marketingSpend: number
+  /** 設備投資額 */
+  capitalExpenditure: number
   /** 新規借入額（マイナスは返済） */
   financing: number
+}
+
+/** 市況イベント（需要に乗数で作用する）。 */
+export interface MarketEvent {
+  id: string
+  /** 表示名（日本語） */
+  label: string
+  /** 説明 */
+  description: string
+  /** 需要に掛ける乗数（1.0 で平常） */
+  demandMultiplier: number
+}
+
+/** resolveTurn に渡す追加オプション（イベントなど）。 */
+export interface TurnOptions {
+  /** 当期の需要乗数（イベント由来。既定 1.0） */
+  demandMultiplier?: number
 }
 
 /**
@@ -110,6 +131,18 @@ export interface SimParams {
   fixedCosts: number
   /** 減価償却率（期首の固定資産簿価に対する割合） */
   depreciationRate: number
+
+  // --- 発生主義（売掛・買掛） ---
+  /** 当期売上のうち掛け売り（期末に売掛金として残る）割合 0..1 */
+  salesOnCreditRatio: number
+  /** 当期仕入のうち掛け仕入（期末に買掛金として残る）割合 0..1 */
+  payableRatio: number
+
+  // --- 販促 ---
+  /** 販促による需要押し上げの最大率（例 0.5 = 最大+50%） */
+  marketingEffect: number
+  /** 効果が最大の半分になる販促費（逓減のスケール） */
+  marketingHalf: number
 
   // --- 財務・税 ---
   /** 有利子負債（期首）に対する利率 */

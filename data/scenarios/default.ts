@@ -43,6 +43,12 @@ export const defaultScenario: Scenario = {
     unitVariableCost: 1_000,
     fixedCosts: 500_000,
     depreciationRate: 0.1,
+    // 発生主義（売掛・買掛）
+    salesOnCreditRatio: 0.4,
+    payableRatio: 0.3,
+    // 販促
+    marketingEffect: 0.5,
+    marketingHalf: 200_000,
     // 財務・税
     interestRate: 0.03,
     effectiveTaxRate: 0.3,

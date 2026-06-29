@@ -8,9 +8,13 @@ export type {
   SimParams,
   Ratios,
   TurnResult,
+  TurnOptions,
+  MarketEvent,
 } from './types'
 
 export { totalAssets, totalLiabilities, totalEquity, balances } from './statements/identity'
 export { demandAt } from './market/demand'
 export { computeRatios } from './finance/ratios'
-export { resolveTurn } from './engine/resolveTurn'
+export { resolveTurn, marketingMultiplier } from './engine/resolveTurn'
+export { drawEvent } from './engine/events'
+export { createRng, hashUnit } from './util/rng'

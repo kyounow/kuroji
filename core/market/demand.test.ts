@@ -9,6 +9,10 @@ const params: SimParams = {
   unitVariableCost: 1_000,
   fixedCosts: 500_000,
   depreciationRate: 0.1,
+  salesOnCreditRatio: 0.4,
+  payableRatio: 0.3,
+  marketingEffect: 0.5,
+  marketingHalf: 200_000,
   interestRate: 0.03,
   effectiveTaxRate: 0.3,
 }
