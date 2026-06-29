@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Decision } from '@core/index'
-import { totalEquity, productFromRd } from '@core/index'
+import { totalEquity, productFromRd, scoreGame } from '@core/index'
 import { useGame } from './state'
 import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
@@ -8,6 +8,8 @@ import { StatementsView } from './components/StatementsView'
 import { RatiosView } from './components/RatiosView'
 import { HistoryTable } from './components/HistoryTable'
 import { HistoryChart } from './components/HistoryChart'
+import { ScoreCard } from './components/ScoreCard'
+import { loadBest, saveBest } from './storage'
 import { yen, yenSigned, pct, num } from './format'
 
 export function App() {
@@ -34,6 +36,29 @@ export function App() {
 
   const equity = totalEquity(game.current.balanceSheet)
   const startEquity = totalEquity(scenario.initialState.balanceSheet)
+
+  // 期末スコア（ゲーム終了時のみ）。
+  const score = useMemo(() => {
+    if (!gameOver || game.history.length === 0) return null
+    return scoreGame({
+      startEquity,
+      endEquity: equity,
+      finalRatios: game.history[game.history.length - 1].ratios,
+      roeHistory: game.history.map((h) => h.ratios.roe),
+      won: game.outcome === 'won',
+      turnsUsed: game.current.turn,
+      turnLimit: scenario.turnLimit ?? game.current.turn,
+    })
+  }, [gameOver, game.history, game.outcome, game.current.turn, scenario.turnLimit, startEquity, equity])
+
+  // ベストスコア（シナリオごと）。終了時に保存。
+  const [best, setBest] = useState<number | null>(null)
+  useEffect(() => {
+    setBest(loadBest(game.scenarioId))
+  }, [game.scenarioId])
+  useEffect(() => {
+    if (gameOver && score) setBest(saveBest(game.scenarioId, score.total))
+  }, [gameOver, score, game.scenarioId])
 
   // 現在の累積R&Dから決まる製品パラメータ（次の期に適用される）。
   const product = productFromRd(game.current.rdStock, scenario.params)
@@ -112,6 +137,8 @@ export function App() {
           )}
         </div>
       )}
+
+      {gameOver && score && <ScoreCard score={score} best={best} won={game.outcome === 'won'} />}
 
       <EventBanner event={upcomingEvent} />
 

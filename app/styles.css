@@ -137,6 +137,72 @@ h2 {
   background: color-mix(in srgb, var(--good) 14%, transparent);
 }
 
+/* スコアカード */
+.scorecard {
+  border-left: 4px solid var(--accent);
+}
+
+.score-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.score-head h2 {
+  margin: 0;
+}
+
+.score-total {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.stars {
+  font-size: 1.4rem;
+  color: #f0a500;
+  letter-spacing: 2px;
+}
+
+.stars-dim {
+  color: color-mix(in srgb, var(--fg) 20%, transparent);
+}
+
+.score-bars {
+  margin: 0.75rem 0 0.25rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 9rem 1fr 4rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.score-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--fg) 12%, transparent);
+  overflow: hidden;
+}
+
+.score-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.score-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 /* シナリオ選択 */
 .scenario-select {
   display: inline-flex;
