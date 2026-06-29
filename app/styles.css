@@ -322,6 +322,50 @@ table.history tbody tr.selected {
   outline-offset: -2px;
 }
 
+/* 製品パネル */
+.product {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  background: var(--panel);
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+/* 三表ヘッダ＋表/グラフ切替 */
+.statements-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent);
+  padding: 0.35rem 0.9rem;
+}
+
+.seg button.on {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* グラフ */
 .chart {
   width: 100%;
@@ -329,6 +373,39 @@ table.history tbody tr.selected {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+/* ウォーターフォール */
+.wf-total {
+  fill: var(--accent-2);
+}
+.wf-up {
+  fill: var(--good);
+}
+.wf-down {
+  fill: var(--bad);
+}
+.wf-value {
+  fill: var(--fg);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.wf-label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+/* B/S 凡例 */
+.bs-legend {
+  gap: 0.4rem 0.9rem;
+}
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 0.3rem;
+  vertical-align: middle;
 }
 
 .line-equity {

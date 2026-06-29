@@ -5,10 +5,11 @@ import { balances, totalAssets, totalLiabilities, totalEquity } from '@core/stat
 import { resolveTurn, marketingMultiplier } from './resolveTurn'
 
 // 在庫を一定に保つ「定常運転」の判断を作る（生産＝販売見込み数量に近い）。
-const steady = (unitPrice: number, produceUnits: number): Decision => ({
+const steady = (unitPrice: number, produceUnits: number, rdSpend = 0): Decision => ({
   unitPrice,
   produceUnits,
   marketingSpend: 0,
+  rdSpend,
   capitalExpenditure: 0,
   financing: 0,
 })
@@ -94,6 +95,7 @@ describe('resolveTurn（発生主義モデル）', () => {
       unitPrice: 2_500,
       produceUnits: 1_500,
       marketingSpend: 100_000,
+      rdSpend: 300_000,
       capitalExpenditure: 1_000_000,
       financing: 800_000,
     }
@@ -114,9 +116,55 @@ describe('resolveTurn（発生主義モデル）', () => {
     expect(s.turn).toBe(10)
   })
 
+  it('R&Dを積むと実効製造原価が下がる', () => {
+    const { initialState, params } = getScenario('default')
+    const base = resolveTurn(initialState, steady(2_000, 0), params).effectiveUnitCost
+    const researched = resolveTurn(
+      { ...initialState, rdStock: 2_000_000 },
+      steady(2_000, 0),
+      params,
+    ).effectiveUnitCost
+    expect(researched).toBeLessThan(base)
+  })
+
+  it('R&Dを積むと同じ価格でも需要（販売数量）が増える', () => {
+    const { initialState, params } = getScenario('default')
+    // 在庫切れにならないよう十分生産する
+    const base = resolveTurn(initialState, steady(2_000, 5_000), params).unitsSold
+    const researched = resolveTurn(
+      { ...initialState, rdStock: 2_000_000 },
+      steady(2_000, 5_000),
+      params,
+    ).unitsSold
+    expect(researched).toBeGreaterThan(base)
+  })
+
+  it('R&D費は当期の費用として純利益を押し下げ、rdStock に累積する', () => {
+    const { initialState, params } = getScenario('default')
+    const withoutRd = resolveTurn(initialState, steady(2_000, 0, 0), params)
+    const withRd = resolveTurn(initialState, steady(2_000, 0, 300_000), params)
+    expect(withRd.incomeStatement.operatingExpenses).toBe(
+      withoutRd.incomeStatement.operatingExpenses + 300_000,
+    )
+    expect(withRd.state.rdStock).toBe(initialState.rdStock + 300_000)
+  })
+
+  it('在庫の単価と異なる原価で生産しても恒等式は崩れない（移動平均）', () => {
+    const { initialState, params } = getScenario('default')
+    // R&Dで原価が下がった状態で大量生産 → 在庫の評価単価が混ざる
+    const s = { ...initialState, rdStock: 3_000_000 }
+    const { state } = resolveTurn(s, steady(2_200, 3_000), params)
+    expect(balances(state.balanceSheet)).toBe(true)
+    // 在庫数量と評価額の整合（数量が増えていれば評価額も正）
+    expect(state.inventoryUnits).toBeGreaterThanOrEqual(0)
+    expect(state.balanceSheet.currentAssets.inventory).toBeGreaterThanOrEqual(0)
+  })
+
   it('明示パラメータで損益が手計算と一致する', () => {
     const state: CompanyState = {
       turn: 0,
+      inventoryUnits: 1_000,
+      rdStock: 0,
       balanceSheet: {
         currentAssets: { cash: 1_000_000, accountsReceivable: 0, inventory: 1_000_000 },
         fixedAssets: { equipment: 1_000_000 },
@@ -136,6 +184,9 @@ describe('resolveTurn（発生主義モデル）', () => {
       payableRatio: 0.3,
       marketingEffect: 0.5,
       marketingHalf: 200_000,
+      rdCostReductionMax: 0.4,
+      rdDemandBoostMax: 0.5,
+      rdHalf: 1_000_000,
       interestRate: 0.04,
       effectiveTaxRate: 0.3,
     }

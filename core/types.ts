@@ -47,6 +47,18 @@ export interface CompanyState {
   /** 経過ターン数（会計期間の通し番号、0 始まり） */
   turn: number
   balanceSheet: BalanceSheet
+  /** 在庫の数量。評価額は balanceSheet.currentAssets.inventory（移動平均法で評価）。 */
+  inventoryUnits: number
+  /** 累積の研究開発投資。製品パラメータ（製造原価・需要）を規定する。 */
+  rdStock: number
+}
+
+/** 研究開発の成果として変化する製品パラメータ。 */
+export interface ProductState {
+  /** 製造原価の倍率（1.0 = 基準。R&D で低下し、原価が下がる） */
+  unitCostModifier: number
+  /** 需要の倍率（1.0 = 基準。R&D で上昇し、売れやすくなる） */
+  demandModifier: number
 }
 
 /** 1ターンの経営判断。 */
@@ -57,6 +69,8 @@ export interface Decision {
   produceUnits: number
   /** 販促費（需要を押し上げるが費用になる） */
   marketingSpend: number
+  /** 研究開発費（累積して製品を改良：原価↓・需要↑。費用計上） */
+  rdSpend: number
   /** 設備投資額 */
   capitalExpenditure: number
   /** 新規借入額（マイナスは返済） */
@@ -109,6 +123,10 @@ export interface TurnResult {
   cashFlow: CashFlowStatement
   /** 販売数量 */
   unitsSold: number
+  /** 当期に適用された実効製造原価（R&D 反映後の1個あたり原価） */
+  effectiveUnitCost: number
+  /** 当期に適用された製品パラメータ */
+  product: ProductState
 }
 
 /**
@@ -143,6 +161,14 @@ export interface SimParams {
   marketingEffect: number
   /** 効果が最大の半分になる販促費（逓減のスケール） */
   marketingHalf: number
+
+  // --- 研究開発（製品パラメータ） ---
+  /** 累積R&Dによる製造原価の最大削減率（例 0.4 = 最大−40%） */
+  rdCostReductionMax: number
+  /** 累積R&Dによる需要の最大押し上げ率（例 0.5 = 最大+50%） */
+  rdDemandBoostMax: number
+  /** 効果が最大の半分になる累積R&D（逓減のスケール） */
+  rdHalf: number
 
   // --- 財務・税 ---
   /** 有利子負債（期首）に対する利率 */

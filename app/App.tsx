@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Decision } from '@core/index'
-import { totalEquity } from '@core/index'
+import { totalEquity, productFromRd } from '@core/index'
 import { useGame } from './state'
 import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
@@ -8,7 +8,7 @@ import { StatementsView } from './components/StatementsView'
 import { RatiosView } from './components/RatiosView'
 import { HistoryTable } from './components/HistoryTable'
 import { HistoryChart } from './components/HistoryChart'
-import { yen, yenSigned } from './format'
+import { yen, yenSigned, pct } from './format'
 
 export function App() {
   const { game, scenario, play, reset, upcomingEvent } = useGame()
@@ -17,6 +17,7 @@ export function App() {
     unitPrice: scenario.params.basePrice,
     produceUnits: scenario.params.baseDemand,
     marketingSpend: 0,
+    rdSpend: 0,
     capitalExpenditure: 0,
     financing: 0,
   })
@@ -31,6 +32,10 @@ export function App() {
 
   const equity = totalEquity(game.current.balanceSheet)
   const startEquity = totalEquity(scenario.initialState.balanceSheet)
+
+  // 現在の累積R&Dから決まる製品パラメータ（次の期に適用される）。
+  const product = productFromRd(game.current.rdStock, scenario.params)
+  const effectiveCost = Math.round(scenario.params.unitVariableCost * product.unitCostModifier)
 
   return (
     <main className="app">
@@ -63,6 +68,31 @@ export function App() {
       )}
 
       <EventBanner event={upcomingEvent} />
+
+      <section className="product">
+        <h2>製品の状態（研究開発の成果）</h2>
+        <div className="product-grid">
+          <div className="metric">
+            <div className="metric-value">{yen(effectiveCost)}</div>
+            <div className="metric-label">実効製造原価/個（基準 {yen(scenario.params.unitVariableCost)}）</div>
+          </div>
+          <div className="metric">
+            <div className="metric-value">−{pct(1 - product.unitCostModifier)}</div>
+            <div className="metric-label">原価削減率</div>
+          </div>
+          <div className="metric">
+            <div className="metric-value">+{pct(product.demandModifier - 1)}</div>
+            <div className="metric-label">需要押し上げ</div>
+          </div>
+          <div className="metric">
+            <div className="metric-value">{yen(game.current.rdStock)}</div>
+            <div className="metric-label">累積R&D投資</div>
+          </div>
+        </div>
+        <p className="muted small">
+          研究開発費を投じるほど、製造原価が下がり需要が上がります（効果は逓減し、翌期以降に反映）。
+        </p>
+      </section>
 
       <DecisionPanel
         decision={decision}

@@ -68,6 +68,13 @@ export function DecisionPanel({ decision, onChange, onPlay, onReset, disabled }:
           hint="需要を押し上げる（逓減）"
         />
         <Field
+          label="研究開発費（R&D）"
+          value={decision.rdSpend}
+          onChange={(v) => onChange({ rdSpend: v })}
+          step={50_000}
+          hint="累積で原価↓・需要↑（翌期以降）"
+        />
+        <Field
           label="設備投資"
           value={decision.capitalExpenditure}
           onChange={(v) => onChange({ capitalExpenditure: v })}

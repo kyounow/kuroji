@@ -8,6 +8,7 @@ import type {
   TurnResult,
 } from '@core/types'
 import { demandAt } from '@core/market/demand'
+import { productFromRd } from '@core/product/research'
 
 /** 販促費から需要乗数を求める（逓減効果、上限あり）。 */
 export function marketingMultiplier(spend: number, params: SimParams): number {
@@ -19,16 +20,16 @@ export function marketingMultiplier(spend: number, params: SimParams): number {
  * 1ターン（1会計期間）を解決する純粋関数。発生主義の簡易モデル。
  *
  * モデルの要点（学習用に簡略化）:
- *   - 在庫: 期首在庫＋当期生産のうち、需要分だけ販売。売れ残りは在庫として繰越。
- *           売上原価は「販売数量 × 単価原価」（費用収益対応）。
+ *   - 在庫: 期首在庫＋当期生産のうち需要分だけ販売。売れ残りは在庫として繰越。
+ *           評価は移動平均法。売上原価 = 販売数量 × 移動平均単価（費用収益対応）。
+ *   - 研究開発: 累積R&D（rdStock）に応じて製造原価が下がり需要が上がる（productFromRd）。
+ *               当期のR&D費は費用計上し、その成果（rdStock 増加）は翌期以降に効く。
  *   - 売掛金: 当期売上の一部（salesOnCreditRatio）は期末に売掛金として残り、現金は翌期回収。
- *             期首の売掛金は当期に現金回収する。
  *   - 買掛金: 当期仕入（生産費）の一部（payableRatio）は期末に買掛金として残り、現金は翌期支払。
- *             期首の買掛金は当期に現金支払する。
  *   - 減価償却: 期首の固定資産簿価に対して計上（当期取得分は翌期から）。非現金。
- *   - 在庫の評価単価は params.unitVariableCost で一定とみなす。
  *
- * これにより「営業 CF = 当期純利益 ＋ 減価償却 − ΔAR − Δ在庫 ＋ ΔAP」が成立し、
+ * 在庫の増減は常に ΔInv = 生産費 − 売上原価 に等しいので、
+ * 「営業 CF = 純利益 + 減価償却 − ΔAR − Δ在庫 + ΔAP」が成立し、
  * 期末の会計恒等式（資産 = 負債 + 純資産）が常に保たれる（数値はすべて整数円）。
  */
 export function resolveTurn(
@@ -38,33 +39,50 @@ export function resolveTurn(
   options: TurnOptions = {},
 ): TurnResult {
   const bs = state.balanceSheet
-  const unitCost = params.unitVariableCost
+
+  // --- 製品パラメータ（期首時点の累積R&Dで決まる） ---
+  const product = productFromRd(state.rdStock, params)
+  const effectiveUnitCost = Math.max(0, Math.round(params.unitVariableCost * product.unitCostModifier))
 
   // 期首残高
   const cashBegin = bs.currentAssets.cash
   const arBegin = bs.currentAssets.accountsReceivable
-  const invBegin = bs.currentAssets.inventory
+  const invValueBegin = bs.currentAssets.inventory
+  const invUnitsBegin = Math.max(0, state.inventoryUnits)
   const apBegin = bs.currentLiabilities.accountsPayable
-  const invUnitsBegin = unitCost > 0 ? Math.round(invBegin / unitCost) : 0
 
-  // --- 需要と販売 ---
+  // --- 需要と販売（在庫は移動平均で評価） ---
   const demandMultiplier = options.demandMultiplier ?? 1
   const rawDemand = demandAt(decision.unitPrice, params)
   const demand = Math.max(
     0,
-    Math.round(rawDemand * marketingMultiplier(decision.marketingSpend, params) * demandMultiplier),
+    Math.round(
+      rawDemand *
+        marketingMultiplier(decision.marketingSpend, params) *
+        demandMultiplier *
+        product.demandModifier,
+    ),
   )
-  const unitsAvailable = invUnitsBegin + Math.max(0, decision.produceUnits)
-  const unitsSold = Math.min(demand, unitsAvailable)
+
+  const produce = Math.max(0, decision.produceUnits)
+  const productionCost = effectiveUnitCost * produce
+  const unitsAfterProduce = invUnitsBegin + produce
+  const valueAfterProduce = invValueBegin + productionCost
+  const avgCost = unitsAfterProduce > 0 ? valueAfterProduce / unitsAfterProduce : 0
+
+  const unitsSold = Math.min(demand, unitsAfterProduce)
+  const costOfGoodsSold = Math.round(unitsSold * avgCost)
+  const invUnitsEnd = unitsAfterProduce - unitsSold
+  const invValueEnd = valueAfterProduce - costOfGoodsSold // ΔInv = 生産費 − 売上原価 を保証
 
   // --- 損益計算書（P/L） ---
   const revenue = Math.round(decision.unitPrice * unitsSold)
-  const costOfGoodsSold = unitCost * unitsSold
   const grossProfit = revenue - costOfGoodsSold
 
   const depreciation = Math.round(bs.fixedAssets.equipment * params.depreciationRate)
   const marketingSpend = Math.max(0, decision.marketingSpend)
-  const operatingExpenses = params.fixedCosts + depreciation + marketingSpend
+  const rdSpend = Math.max(0, decision.rdSpend)
+  const operatingExpenses = params.fixedCosts + depreciation + marketingSpend + rdSpend
   const operatingIncome = grossProfit - operatingExpenses
 
   const interestBearingDebt =
@@ -88,13 +106,11 @@ export function resolveTurn(
   }
 
   // --- 期末の資産・負債（発生主義） ---
-  const productionCost = unitCost * Math.max(0, decision.produceUnits) // 当期仕入（在庫に積む）
   const arEnd = Math.round(revenue * params.salesOnCreditRatio)
   const apEnd = Math.round(productionCost * params.payableRatio)
-  const invEnd = invBegin + productionCost - costOfGoodsSold // 在庫の増減（生産 − 販売原価）
 
   const deltaAR = arEnd - arBegin
-  const deltaInv = invEnd - invBegin
+  const deltaInv = invValueEnd - invValueBegin
   const deltaAP = apEnd - apBegin
 
   // --- キャッシュ・フロー計算書（間接法・整合保証） ---
@@ -113,14 +129,16 @@ export function resolveTurn(
     cashEnd,
   }
 
-  // --- 期末の貸借対照表（B/S） ---
+  // --- 期末の貸借対照表（B/S）と状態 ---
   const nextState: CompanyState = {
     turn: state.turn + 1,
+    inventoryUnits: invUnitsEnd,
+    rdStock: state.rdStock + rdSpend,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,
         accountsReceivable: arEnd,
-        inventory: invEnd,
+        inventory: invValueEnd,
       },
       fixedAssets: {
         equipment: bs.fixedAssets.equipment - depreciation + decision.capitalExpenditure,
@@ -139,5 +157,5 @@ export function resolveTurn(
     },
   }
 
-  return { state: nextState, incomeStatement, cashFlow, unitsSold }
+  return { state: nextState, incomeStatement, cashFlow, unitsSold, effectiveUnitCost, product }
 }

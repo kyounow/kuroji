@@ -10,11 +10,13 @@ export type {
   TurnResult,
   TurnOptions,
   MarketEvent,
+  ProductState,
 } from './types'
 
 export { totalAssets, totalLiabilities, totalEquity, balances } from './statements/identity'
 export { demandAt } from './market/demand'
 export { computeRatios } from './finance/ratios'
+export { productFromRd } from './product/research'
 export { resolveTurn, marketingMultiplier } from './engine/resolveTurn'
 export { drawEvent } from './engine/events'
 export { createRng, hashUnit } from './util/rng'

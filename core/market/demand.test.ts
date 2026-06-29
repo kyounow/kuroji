@@ -13,6 +13,9 @@ const params: SimParams = {
   payableRatio: 0.3,
   marketingEffect: 0.5,
   marketingHalf: 200_000,
+  rdCostReductionMax: 0.4,
+  rdDemandBoostMax: 0.5,
+  rdHalf: 1_000_000,
   interestRate: 0.03,
   effectiveTaxRate: 0.3,
 }

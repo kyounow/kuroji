@@ -12,6 +12,8 @@ export const defaultScenario: Scenario = {
     '現金と最低限の設備を持つ小さな会社を経営する。価格と投資、資金繰りを判断しながら黒字経営を目指す。',
   initialState: {
     turn: 0,
+    inventoryUnits: 1_000, // 在庫 1,000,000 円 ÷ 基準原価 1,000 円 = 1,000 個
+    rdStock: 0,
     balanceSheet: {
       currentAssets: {
         cash: 5_000_000,
@@ -49,6 +51,10 @@ export const defaultScenario: Scenario = {
     // 販促
     marketingEffect: 0.5,
     marketingHalf: 200_000,
+    // 研究開発（製品パラメータ）
+    rdCostReductionMax: 0.4,
+    rdDemandBoostMax: 0.5,
+    rdHalf: 1_000_000,
     // 財務・税
     interestRate: 0.03,
     effectiveTaxRate: 0.3,

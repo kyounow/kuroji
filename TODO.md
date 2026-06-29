@@ -33,6 +33,20 @@
 - [x] 市況イベント（決定論的抽選）— `core/engine/events.ts` / `data/events/`
 - [ ] 欠損金の繰越控除、消費税、短期借入の自動枠など（今後）
 
+## 製品・研究開発（R&D）✅
+
+- [x] 在庫評価を移動平均法に刷新（原価が変動しても恒等式を維持）
+- [x] 研究開発費 → 累積R&D（rdStock）→ 製品パラメータ（製造原価↓・需要↑、逓減）— `core/product/research.ts`
+- [x] R&D費は当期費用、成果は翌期以降に反映
+- [x] UI に製品パラメータ表示と R&D 入力
+- [ ] 製品ラインの複数化・品質/価格帯セグメントなど（今後）
+
+## 三表のグラフ化 ✅
+
+- [x] B/S を積み上げ棒（資産 vs 負債+純資産）で可視化 — `app/components/BalanceSheetChart.tsx`
+- [x] P/L・C/F をウォーターフォールで可視化 — `app/components/WaterfallChart.tsx`
+- [x] 表 / グラフ の切替
+
 ## Phase 3 — UI ✅
 
 - [x] 三表ダッシュボード（BS / PL / CF を表形式で表示）— `app/components/StatementsView.tsx`
