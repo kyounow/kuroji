@@ -9,13 +9,16 @@
 - [x] 会計恒等式テスト（`core/statements/identity.test.ts`）で TDD の起点と CI 緑化
 - [x] `npm run dev / test / build` が通る土台
 
-## Phase 1 — 会計エンジン中核
+## Phase 1 — 会計エンジン中核 ✅（ほぼ完了）
 
-- [ ] ドメイン型の確定（`CompanyState` / `BalanceSheet` / `IncomeStatement` / `Decision` / `Ratios`）
-- [ ] 単一期の解決関数 `resolveTurn(state, decisions, params)` の骨格（純粋関数）
-- [ ] BS / PL の生成と**会計恒等式・利益剰余金繰越**のテスト
-- [ ] 主要経営指標: 流動比率・自己資本比率・ROE・ROA・粗利率・営業利益率
-- [ ] キャッシュフロー計算書（間接法）と現金増減の整合テスト
+- [x] ドメイン型（`CompanyState` / `BalanceSheet` / `IncomeStatement` / `CashFlowStatement` / `Decision` / `SimParams` / `Ratios` / `TurnResult`）
+- [x] 単一期の解決関数 `resolveTurn(state, decision, params)`（純粋関数）— `core/engine/resolveTurn.ts`
+- [x] BS / PL の生成と**会計恒等式・利益剰余金繰越**のテスト
+- [x] 主要経営指標: 流動比率・自己資本比率・ROE・ROA・粗利率・営業利益率 — `core/finance/ratios.ts`
+- [x] キャッシュフロー計算書（間接法）と現金増減の整合テスト
+- [x] 価格→需要モデル（先取り実装）— `core/market/demand.ts`
+- [x] UI で1期シミュレーション（価格スライダー＋三表/指標プレビュー）
+- [ ] 売掛金・買掛金・在庫変動を伴う発生主義モデルへの拡張（現状は当期現金決済の簡略前提）
 
 ## Phase 2 — 経営判断 & 市場モデル
 

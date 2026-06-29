@@ -34,11 +34,17 @@ export const defaultScenario: Scenario = {
       },
     },
   },
-  market: {
+  params: {
+    // 需要
     baseDemand: 1_000,
     basePrice: 2_000,
     priceElasticity: 1.2,
+    // コスト
     unitVariableCost: 1_000,
+    fixedCosts: 500_000,
+    depreciationRate: 0.1,
+    // 財務・税
+    interestRate: 0.03,
     effectiveTaxRate: 0.3,
   },
 }

@@ -1,7 +1,7 @@
 import type { Scenario } from './types'
 import { defaultScenario } from './default'
 
-export type { Scenario, MarketParams } from './types'
+export type { Scenario, SimParams } from './types'
 
 /** 利用可能なシナリオのレジストリ。 */
 const SCENARIOS: Record<string, Scenario> = {
