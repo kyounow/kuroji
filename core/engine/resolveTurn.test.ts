@@ -11,6 +11,7 @@ const decide = (d: Partial<Decision> = {}): Decision => ({
   produceUnits: 0,
   marketingSpend: 0,
   rdSpend: 0,
+  insuranceSpend: 0,
   capitalExpenditure: 0,
   financing: 0,
   ...d,
@@ -202,6 +203,38 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(weak).toBeGreaterThan(strong)
   })
 
+  it('突発ショック（一時損失）は特別損失となり、恒等式・CF整合を保つ', () => {
+    const { initialState, params } = getScenario('default')
+    const r = resolveTurn(initialState, decide({ produceUnits: 0 }), params, { oneOffLoss: 700_000 })
+    expect(r.incomeStatement.extraordinaryLoss).toBe(700_000) // 保険なし→全額
+    expect(balances(r.state.balanceSheet)).toBe(true)
+    expect(r.cashFlow.cashEnd).toBe(r.state.balanceSheet.currentAssets.cash)
+  })
+
+  it('保険は特別損失を補償率ぶん軽減する', () => {
+    const { initialState, params } = getScenario('default')
+    // insuranceRefCost 200,000・maxCoverage 0.8。保険料200,000で補償0.8
+    const insured = resolveTurn(initialState, decide({ insuranceSpend: 200_000 }), params, {
+      oneOffLoss: 1_000_000,
+    })
+    expect(insured.insuranceCoverage).toBeCloseTo(0.8)
+    expect(insured.incomeStatement.extraordinaryLoss).toBe(200_000) // (1-0.8)*1,000,000
+    expect(balances(insured.state.balanceSheet)).toBe(true)
+  })
+
+  it('設備毀損は設備簿価を減らし、恒等式を保つ', () => {
+    const { initialState, params } = getScenario('default')
+    const before = initialState.balanceSheet.fixedAssets.equipment
+    const dep = Math.round(before * params.depreciationRate)
+    const r = resolveTurn(initialState, decide({ produceUnits: 0 }), params, { equipmentLoss: 1_000_000 })
+    expect(r.state.balanceSheet.fixedAssets.equipment).toBe(before - dep - 1_000_000)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+    // 営業CFは純利益＋(減価償却＋設備毀損)−ΔAR−Δ棚卸＋ΔAP で整合
+    expect(r.cashFlow.operating).toBe(
+      r.incomeStatement.netIncome + dep + 1_000_000 - r.deltaAR - r.deltaInventory + r.deltaAP,
+    )
+  })
+
   it('明示パラメータで損益が手計算と一致する', () => {
     // 期首: 現金 1,000,000 / 原材料 0 / 製品 1,000個=1,000,000 / 設備 1,000,000
     //       長期借入 500,000 / 資本金 1,000,000 / 利益剰余金 1,500,000
@@ -233,6 +266,8 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
       payableRatio: 0.3,
       marketingEffect: 0.5,
       marketingHalf: 200_000,
+      insuranceRefCost: 200_000,
+      maxInsuranceCoverage: 0.8,
       rdCostReductionMax: 0.4,
       rdDemandBoostMax: 0.5,
       rdHalf: 1_000_000,

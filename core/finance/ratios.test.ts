@@ -18,6 +18,7 @@ const pl: IncomeStatement = {
   operatingExpenses: 250,
   operatingIncome: 150,
   interestExpense: 30,
+  extraordinaryLoss: 0,
   pretaxIncome: 120,
   tax: 60,
   netIncome: 60,

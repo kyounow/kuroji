@@ -37,6 +37,8 @@ export const startupScenario: Scenario = {
     payableRatio: 0.3,
     marketingEffect: 0.6,
     marketingHalf: 300_000,
+    insuranceRefCost: 300_000,
+    maxInsuranceCoverage: 0.8,
     rdCostReductionMax: 0.5,
     rdDemandBoostMax: 1.0,
     rdHalf: 800_000,

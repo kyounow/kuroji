@@ -40,6 +40,7 @@ export interface IncomeStatement {
   operatingExpenses: number // 販売費及び一般管理費
   operatingIncome: number // 営業利益
   interestExpense: number // 支払利息
+  extraordinaryLoss: number // 特別損失（突発ショック、保険適用後の純額）
   pretaxIncome: number // 税引前当期純利益
   tax: number // 法人税等
   netIncome: number // 当期純利益
@@ -80,13 +81,15 @@ export interface Decision {
   marketingSpend: number
   /** 研究開発費（累積して製品を改良：原価↓・需要↑。費用計上） */
   rdSpend: number
+  /** 保険料（毎期支払う費用。突発ショックの損失を一部ヘッジする） */
+  insuranceSpend: number
   /** 設備投資額 */
   capitalExpenditure: number
   /** 新規借入額（マイナスは返済） */
   financing: number
 }
 
-/** 市況イベント（需要に乗数で作用する）。 */
+/** 市況イベント（需要乗数のほか、突発ショックの損失を持てる）。 */
 export interface MarketEvent {
   id: string
   /** 表示名（日本語） */
@@ -95,6 +98,10 @@ export interface MarketEvent {
   description: string
   /** 需要に掛ける乗数（1.0 で平常） */
   demandMultiplier: number
+  /** 一時的な現金損失（訴訟・リコール等。保険でヘッジ可能） */
+  oneOffLoss?: number
+  /** 設備の毀損額（故障・災害等。簿価から控除。保険でヘッジ可能） */
+  equipmentLoss?: number
 }
 
 /** resolveTurn に渡す追加オプション（イベントなど）。 */
@@ -103,6 +110,10 @@ export interface TurnOptions {
   demandMultiplier?: number
   /** 次ターンへ持ち越す原材料スポット価格指数（既定は当期の materialIndex を維持＝変動なし）。 */
   nextMaterialIndex?: number
+  /** 当期の突発ショックによる一時的現金損失（保険適用前） */
+  oneOffLoss?: number
+  /** 当期の突発ショックによる設備毀損額（保険適用前） */
+  equipmentLoss?: number
 }
 
 /**
@@ -148,6 +159,8 @@ export interface TurnResult {
   effectiveInterestRate: number
   /** 当期に実際に適用された資金調達額（借入枠でキャップ後） */
   appliedFinancing: number
+  /** 当期の保険補償率（0..1） */
+  insuranceCoverage: number
 }
 
 /**
@@ -186,6 +199,12 @@ export interface SimParams {
   marketingEffect: number
   /** 効果が最大の半分になる販促費（逓減のスケール） */
   marketingHalf: number
+
+  // --- 保険（突発ショックのヘッジ） ---
+  /** 最大補償を得るのに必要な保険料（この額で maxInsuranceCoverage に到達） */
+  insuranceRefCost: number
+  /** 保険の最大補償率（0..1。例 0.8 = 損失の最大80%をヘッジ） */
+  maxInsuranceCoverage: number
 
   // --- 研究開発（製品パラメータ） ---
   /** 累積R&Dによる製造原価の最大削減率（例 0.4 = 最大−40%） */

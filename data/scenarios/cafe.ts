@@ -36,6 +36,8 @@ export const cafeScenario: Scenario = {
     payableRatio: 0.4,
     marketingEffect: 0.4,
     marketingHalf: 100_000,
+    insuranceRefCost: 100_000,
+    maxInsuranceCoverage: 0.8,
     rdCostReductionMax: 0.2,
     rdDemandBoostMax: 0.6,
     rdHalf: 500_000,

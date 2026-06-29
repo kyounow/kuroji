@@ -91,6 +91,8 @@ function reducer(game: GameState, action: Action): GameState {
       const result = resolveTurn(game.current, action.decision, scenario.params, {
         demandMultiplier: event.demandMultiplier,
         nextMaterialIndex,
+        oneOffLoss: event.oneOffLoss,
+        equipmentLoss: event.equipmentLoss,
       })
       const record: TurnRecord = {
         turn: result.state.turn,

@@ -57,6 +57,9 @@ export const defaultScenario: Scenario = {
     // 販促
     marketingEffect: 0.5,
     marketingHalf: 200_000,
+    // 保険
+    insuranceRefCost: 200_000,
+    maxInsuranceCoverage: 0.8,
     // 研究開発（製品パラメータ）
     rdCostReductionMax: 0.4,
     rdDemandBoostMax: 0.5,

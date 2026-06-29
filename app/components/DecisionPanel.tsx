@@ -65,6 +65,7 @@ const FIELDS: readonly FieldDef[] = [
   { key: 'produceUnits', label: '生産数量', step: 50, hint: '手持ち原材料が上限' },
   { key: 'marketingSpend', label: '販促費', step: 50_000, hint: '需要を押し上げる（逓減）' },
   { key: 'rdSpend', label: '研究開発費（R&D）', step: 50_000, hint: '累積で原価↓・需要↑（翌期以降）' },
+  { key: 'insuranceSpend', label: '保険料', step: 50_000, hint: '突発ショックの損失をヘッジ' },
   { key: 'capitalExpenditure', label: '設備投資', step: 100_000, hint: '固定資産↑・現金↓' },
   {
     key: 'financing',

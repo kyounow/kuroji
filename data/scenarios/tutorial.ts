@@ -36,6 +36,8 @@ export const tutorialScenario: Scenario = {
     payableRatio: 0.3,
     marketingEffect: 0.5,
     marketingHalf: 200_000,
+    insuranceRefCost: 200_000,
+    maxInsuranceCoverage: 0.8,
     rdCostReductionMax: 0.4,
     rdDemandBoostMax: 0.5,
     rdHalf: 1_000_000,

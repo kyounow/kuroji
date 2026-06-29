@@ -30,4 +30,35 @@ export const defaultEvents: EventTable = [
     weight: 1,
     event: { id: 'viral', label: '話題沸騰', description: 'SNSで話題になり需要が急増。', demandMultiplier: 1.5 },
   },
+  // --- 突発ショック（保険でヘッジ可能） ---
+  {
+    weight: 1,
+    event: {
+      id: 'breakdown',
+      label: '設備故障',
+      description: '設備が故障し、簿価の一部が毀損した。',
+      demandMultiplier: 1.0,
+      equipmentLoss: 600_000,
+    },
+  },
+  {
+    weight: 1,
+    event: {
+      id: 'lawsuit',
+      label: '訴訟・賠償',
+      description: '思わぬ訴訟で賠償金が発生した。',
+      demandMultiplier: 1.0,
+      oneOffLoss: 700_000,
+    },
+  },
+  {
+    weight: 1,
+    event: {
+      id: 'recall',
+      label: 'リコール',
+      description: '不具合でリコール。費用がかかり評判も落ちた。',
+      demandMultiplier: 0.85,
+      oneOffLoss: 400_000,
+    },
+  },
 ]

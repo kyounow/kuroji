@@ -22,6 +22,7 @@ export function App() {
     produceUnits: scenario.params.baseDemand,
     marketingSpend: 0,
     rdSpend: 0,
+    insuranceSpend: 0,
     capitalExpenditure: 0,
     financing: 0,
   })
@@ -35,6 +36,7 @@ export function App() {
       produceUnits: scenario.params.baseDemand,
       marketingSpend: 0,
       rdSpend: 0,
+      insuranceSpend: 0,
       capitalExpenditure: 0,
       financing: 0,
     })

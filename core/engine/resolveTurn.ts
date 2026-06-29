@@ -96,7 +96,8 @@ export function resolveTurn(
   const depreciation = Math.round(bs.fixedAssets.equipment * params.depreciationRate)
   const marketingSpend = Math.max(0, decision.marketingSpend)
   const rdSpend = Math.max(0, decision.rdSpend)
-  const operatingExpenses = params.fixedCosts + depreciation + marketingSpend + rdSpend
+  const insuranceSpend = Math.max(0, decision.insuranceSpend)
+  const operatingExpenses = params.fixedCosts + depreciation + marketingSpend + rdSpend + insuranceSpend
   const operatingIncome = grossProfit - operatingExpenses
 
   // 信用力に応じて金利スプレッドが乗る（期首の財務状態で評価）。
@@ -104,8 +105,20 @@ export function resolveTurn(
   const effectiveInterestRate = params.interestRate + credit.spread
   const debt = bs.currentLiabilities.shortTermDebt + bs.nonCurrentLiabilities.longTermDebt
   const interestExpense = Math.round(debt * effectiveInterestRate)
-  const pretaxIncome = operatingIncome - interestExpense
 
+  // 突発ショック（保険で一部ヘッジ）。設備毀損は簿価から控除（非現金）。
+  const oneOffLoss = Math.max(0, options.oneOffLoss ?? 0)
+  const rawEquipmentLoss = Math.max(0, options.equipmentLoss ?? 0)
+  // 設備の毀損は手持ち簿価まで（マイナスにしない）。
+  const equipmentWritedown = Math.min(rawEquipmentLoss, bs.fixedAssets.equipment)
+  const insuranceCoverage =
+    params.insuranceRefCost > 0
+      ? Math.min(params.maxInsuranceCoverage, insuranceSpend / params.insuranceRefCost)
+      : 0
+  // 特別損失（P/L）は保険適用後の純額。設備の簿価減は全額だが、保険補償分は現金で戻る。
+  const extraordinaryLoss = Math.round((1 - insuranceCoverage) * (oneOffLoss + equipmentWritedown))
+
+  const pretaxIncome = operatingIncome - interestExpense - extraordinaryLoss
   const tax = pretaxIncome > 0 ? Math.round(pretaxIncome * params.effectiveTaxRate) : 0
   const netIncome = pretaxIncome - tax
 
@@ -116,6 +129,7 @@ export function resolveTurn(
     operatingExpenses,
     operatingIncome,
     interestExpense,
+    extraordinaryLoss,
     pretaxIncome,
     tax,
     netIncome,
@@ -136,7 +150,9 @@ export function resolveTurn(
       ? Math.min(decision.financing, credit.borrowLimit)
       : Math.max(decision.financing, -bs.nonCurrentLiabilities.longTermDebt)
 
-  const operating = netIncome + depreciation - deltaAR - deltaInventory + deltaAP
+  // 非現金の設備減（減価償却＋設備毀損）を足し戻す。保険補償分の現金は netIncome 経由で流入。
+  const nonCashEquipReduction = depreciation + equipmentWritedown
+  const operating = netIncome + nonCashEquipReduction - deltaAR - deltaInventory + deltaAP
   const investing = -decision.capitalExpenditure
   const netChange = operating + investing + financing
   const cashEnd = cashBegin + netChange
@@ -165,7 +181,7 @@ export function resolveTurn(
         finishedGoods: finValEnd,
       },
       fixedAssets: {
-        equipment: bs.fixedAssets.equipment - depreciation + decision.capitalExpenditure,
+        equipment: bs.fixedAssets.equipment - nonCashEquipReduction + decision.capitalExpenditure,
       },
       currentLiabilities: {
         accountsPayable: apEnd,
@@ -194,5 +210,6 @@ export function resolveTurn(
     creditGrade: credit.grade,
     effectiveInterestRate,
     appliedFinancing: financing,
+    insuranceCoverage,
   }
 }

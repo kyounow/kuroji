@@ -54,6 +54,9 @@ export function StatementsView({ state, last }: Props) {
         { label: '販管費', value: -pl.operatingExpenses, type: 'delta' },
         { label: '営業利益', value: pl.operatingIncome, type: 'total' },
         { label: '支払利息', value: -pl.interestExpense, type: 'delta' },
+        ...(pl.extraordinaryLoss > 0
+          ? [{ label: '特別損失', value: -pl.extraordinaryLoss, type: 'delta' as const }]
+          : []),
         { label: '法人税', value: -pl.tax, type: 'delta' },
         { label: '純利益', value: pl.netIncome, type: 'total' },
       ]
@@ -107,9 +110,10 @@ export function StatementsView({ state, last }: Props) {
         <Row label="売上高" value={pl.revenue} />
         <Row label="売上原価" value={pl.costOfGoodsSold} />
         <Row label="売上総利益" value={pl.grossProfit} kind="sub" />
-        <Row label="販管費（含 減価償却・販促・R&D）" value={pl.operatingExpenses} />
+        <Row label="販管費（含 減価償却・販促・R&D・保険）" value={pl.operatingExpenses} />
         <Row label="営業利益" value={pl.operatingIncome} kind="sub" />
         <Row label="支払利息" value={pl.interestExpense} />
+        {pl.extraordinaryLoss > 0 && <Row label="特別損失（ショック）" value={pl.extraordinaryLoss} />}
         <Row label="税引前利益" value={pl.pretaxIncome} kind="sub" />
         <Row label="法人税等" value={pl.tax} />
         <tr className={pl.netIncome >= 0 ? 'total ok' : 'total ng'}>
