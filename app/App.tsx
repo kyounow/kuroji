@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Decision } from '@core/index'
-import { totalEquity, productFromRd, scoreGame, assessCredit } from '@core/index'
+import { totalEquity, productFromRd, scoreGame, assessCredit, competitorAt, marketShare } from '@core/index'
 import { useGame } from './state'
 import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
@@ -86,6 +86,11 @@ export function App() {
   // 信用力（格付け・実効金利・借入枠）。期首の財務状態で評価。
   const credit = assessCredit(game.current)
   const effectiveRate = scenario.params.interestRate + credit.spread
+
+  // 競合・市場シェア（現在の販売価格・自社品質でのライブ試算）。
+  const hasCompetitor = scenario.params.competitorStrength > 0
+  const competitor = competitorAt(scenario.params, game.seed, game.current.turn)
+  const ourShare = marketShare(decision.unitPrice, product.demandModifier, competitor, scenario.params)
 
   return (
     <main className="app">
@@ -200,6 +205,29 @@ export function App() {
           研究開発は実効原価を下げ需要を上げます（逓減・翌期以降に反映）。
         </p>
       </section>
+
+      {hasCompetitor && (
+        <section className="product">
+          <h2>競合・市場シェア</h2>
+          <div className="product-grid">
+            <div className="metric">
+              <div className="metric-value">{yen(competitor.price)}</div>
+              <div className="metric-label">競合の価格</div>
+            </div>
+            <div className="metric">
+              <div className="metric-value">{competitor.quality.toFixed(2)}</div>
+              <div className="metric-label">競合の品質（自社 {product.demandModifier.toFixed(2)}）</div>
+            </div>
+            <div className="metric">
+              <div className={`metric-value ${ourShare >= 0.5 ? 'ok' : 'ng'}`}>{pct(ourShare)}</div>
+              <div className="metric-label">自社シェア（この価格での試算）</div>
+            </div>
+          </div>
+          <p className="muted small">
+            シェアは「価格あたり品質」で競合と取り合います。値下げや研究開発（品質）でシェアが伸び、需要に反映されます。
+          </p>
+        </section>
+      )}
 
       <DecisionPanel
         decision={decision}

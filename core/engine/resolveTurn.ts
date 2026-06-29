@@ -75,6 +75,7 @@ export function resolveTurn(
 
   // --- ③ 需要と販売（製品在庫から） ---
   const demandMultiplier = options.demandMultiplier ?? 1
+  const shareMultiplier = options.demandShareMultiplier ?? 1
   const rawDemand = demandAt(decision.unitPrice, params)
   const demand = Math.max(
     0,
@@ -82,7 +83,8 @@ export function resolveTurn(
       rawDemand *
         marketingMultiplier(decision.marketingSpend, params) *
         demandMultiplier *
-        product.demandModifier,
+        product.demandModifier *
+        shareMultiplier,
     ),
   )
   const unitsSold = Math.min(demand, finUnitsAfterProduce)

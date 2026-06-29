@@ -27,6 +27,7 @@ export const tutorialScenario: Scenario = {
     baseDemand: 1_000,
     basePrice: 2_000,
     priceElasticity: 1.2,
+    competitorStrength: 0, // チュートリアルは競合なし
     unitVariableCost: 1_000,
     materialVolatility: 0.1,
     materialMeanReversion: 0.4,

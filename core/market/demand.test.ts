@@ -6,6 +6,7 @@ const params: SimParams = {
   baseDemand: 1_000,
   basePrice: 2_000,
   priceElasticity: 1.2,
+  competitorStrength: 0.3,
   unitVariableCost: 1_000,
   materialVolatility: 0.15,
   materialMeanReversion: 0.3,

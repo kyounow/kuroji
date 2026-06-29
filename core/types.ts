@@ -114,6 +114,8 @@ export interface TurnOptions {
   oneOffLoss?: number
   /** 当期の突発ショックによる設備毀損額（保険適用前） */
   equipmentLoss?: number
+  /** 競合との市場シェアに由来する需要倍率（既定 1.0） */
+  demandShareMultiplier?: number
 }
 
 /**
@@ -175,6 +177,8 @@ export interface SimParams {
   basePrice: number
   /** 価格弾力性（価格1%上昇あたりの需要減少率の目安） */
   priceElasticity: number
+  /** 競合の強さ（0 = 競合なし。大きいほど競合が高品質で手強い） */
+  competitorStrength: number
 
   // --- コスト・原材料 ---
   /** 原材料の基準単価（1製品あたり原材料1単位を消費。スポット価格の基準） */

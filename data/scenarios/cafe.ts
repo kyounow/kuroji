@@ -27,6 +27,7 @@ export const cafeScenario: Scenario = {
     baseDemand: 2_000,
     basePrice: 600,
     priceElasticity: 1.5,
+    competitorStrength: 0.4,
     unitVariableCost: 200,
     materialVolatility: 0.2,
     materialMeanReversion: 0.3,

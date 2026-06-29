@@ -4,6 +4,9 @@ import {
   drawEvent,
   computeRatios,
   materialIndexNext,
+  competitorAt,
+  shareMultiplier,
+  productFromRd,
   evaluateGoal,
   totalEquity,
   type CompanyState,
@@ -88,11 +91,21 @@ function reducer(game: GameState, action: Action): GameState {
         game.seed,
         game.current.turn,
       )
+      // 競合との市場シェアから需要倍率を求める（自社品質は累積R&D由来）。
+      const comp = competitorAt(scenario.params, game.seed, game.current.turn)
+      const ourQuality = productFromRd(game.current.rdStock, scenario.params).demandModifier
+      const demandShareMultiplier = shareMultiplier(
+        action.decision.unitPrice,
+        ourQuality,
+        comp,
+        scenario.params,
+      )
       const result = resolveTurn(game.current, action.decision, scenario.params, {
         demandMultiplier: event.demandMultiplier,
         nextMaterialIndex,
         oneOffLoss: event.oneOffLoss,
         equipmentLoss: event.equipmentLoss,
+        demandShareMultiplier,
       })
       const record: TurnRecord = {
         turn: result.state.turn,

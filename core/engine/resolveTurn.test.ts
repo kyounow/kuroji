@@ -203,6 +203,14 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(weak).toBeGreaterThan(strong)
   })
 
+  it('競合シェア倍率は需要（販売数量）に作用する', () => {
+    const { initialState, params } = getScenario('default')
+    const setup = decide({ purchaseMaterials: 2_000, produceUnits: 2_000 })
+    const base = resolveTurn(initialState, setup, params, { demandShareMultiplier: 1 }).unitsSold
+    const low = resolveTurn(initialState, setup, params, { demandShareMultiplier: 0.6 }).unitsSold
+    expect(low).toBeLessThan(base)
+  })
+
   it('突発ショック（一時損失）は特別損失となり、恒等式・CF整合を保つ', () => {
     const { initialState, params } = getScenario('default')
     const r = resolveTurn(initialState, decide({ produceUnits: 0 }), params, { oneOffLoss: 700_000 })
@@ -257,6 +265,7 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
       baseDemand: 1_000,
       basePrice: 2_000,
       priceElasticity: 1.2,
+      competitorStrength: 0.3,
       unitVariableCost: 1_000,
       materialVolatility: 0,
       materialMeanReversion: 0,

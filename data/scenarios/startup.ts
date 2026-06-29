@@ -28,6 +28,7 @@ export const startupScenario: Scenario = {
     baseDemand: 500,
     basePrice: 5_000,
     priceElasticity: 0.8,
+    competitorStrength: 0.5,
     unitVariableCost: 500,
     materialVolatility: 0.1,
     materialMeanReversion: 0.4,
