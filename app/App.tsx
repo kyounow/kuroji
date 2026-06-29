@@ -113,6 +113,7 @@ export function App() {
         onPlay={() => play(decision)}
         onReset={reset}
         disabled={game.gameOver}
+        materialUnitCost={spotCost}
       />
 
       <HistoryTable

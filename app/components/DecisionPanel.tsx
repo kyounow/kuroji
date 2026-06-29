@@ -7,6 +7,8 @@ interface Props {
   onPlay: () => void
   onReset: () => void
   disabled: boolean
+  /** 当期の原材料スポット単価（仕入の単価表示に使用） */
+  materialUnitCost: number
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -41,7 +43,8 @@ function Field({
 }
 
 /** 経営判断の入力パネル。 */
-export function DecisionPanel({ decision, onChange, onPlay, onReset, disabled }: Props) {
+export function DecisionPanel({ decision, onChange, onPlay, onReset, disabled, materialUnitCost }: Props) {
+  const purchaseCost = materialUnitCost * Math.max(0, decision.purchaseMaterials)
   return (
     <section className="panel">
       <h2>経営判断</h2>
@@ -58,7 +61,7 @@ export function DecisionPanel({ decision, onChange, onPlay, onReset, disabled }:
           value={decision.purchaseMaterials}
           onChange={(v) => onChange({ purchaseMaterials: v })}
           step={50}
-          hint="スポット価格で購入・在庫に"
+          hint={`単価 ${yen(materialUnitCost)}/個 → 仕入額 ${yen(purchaseCost)}`}
         />
         <Field
           label="生産数量"
