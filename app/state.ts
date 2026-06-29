@@ -3,6 +3,7 @@ import {
   resolveTurn,
   drawEvent,
   computeRatios,
+  materialIndexNext,
   totalEquity,
   type CompanyState,
   type Decision,
@@ -25,6 +26,8 @@ export interface TurnRecord {
   event: MarketEvent
   decision: Decision
   unitsSold: number
+  /** 当期の原材料スポット単価（実効仕入原価） */
+  effectiveUnitCost: number
   incomeStatement: IncomeStatement
   cashFlow: CashFlowStatement
   ratios: Ratios
@@ -59,14 +62,22 @@ function reducer(game: GameState, action: Action): GameState {
     case 'play': {
       if (game.gameOver) return game
       const event = drawEvent(eventTable, game.seed, game.current.turn)
+      const nextMaterialIndex = materialIndexNext(
+        game.current.materialIndex,
+        scenario.params,
+        game.seed,
+        game.current.turn,
+      )
       const result = resolveTurn(game.current, action.decision, scenario.params, {
         demandMultiplier: event.demandMultiplier,
+        nextMaterialIndex,
       })
       const record: TurnRecord = {
         turn: result.state.turn,
         event,
         decision: action.decision,
         unitsSold: result.unitsSold,
+        effectiveUnitCost: result.effectiveUnitCost,
         incomeStatement: result.incomeStatement,
         cashFlow: result.cashFlow,
         ratios: computeRatios(result.state.balanceSheet, result.incomeStatement),

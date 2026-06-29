@@ -36,7 +36,7 @@ npm run preview    # 本番ビルドのローカルプレビュー
 
 ## アーキテクチャ早見表
 
-- `core/` … UI 非依存の**ゲーム/会計ドメイン層**（純粋関数）。ターン解決（`engine/resolveTurn.ts`）、BS/PL/CF の生成、減価償却・利息・税・経営指標、需要モデル（`market/`）、研究開発による製品パラメータ（`product/research.ts`）、シード付きRNGとイベント（`util/rng.ts`・`engine/events.ts`）。在庫は**移動平均法**で評価し、原価が変動しても恒等式を保つ。Vitest でテストする中心。`data/` のパラメータを**注入されて**計算する。
+- `core/` … UI 非依存の**ゲーム/会計ドメイン層**（純粋関数）。ターン解決（`engine/resolveTurn.ts`）、BS/PL/CF の生成、減価償却・利息・税・経営指標、需要モデル（`market/demand.ts`）、原材料スポット価格（`market/material.ts`）、研究開発による製品パラメータ（`product/research.ts`）、シード付きRNGとイベント（`util/rng.ts`・`engine/events.ts`）。**棚卸資産は原材料・製品に分かれ、各々「数量」と「移動平均評価額」の二面で管理**（仕入→生産で原材料を製品へ価値保存の振替→販売）。原価が変動しても恒等式を保つ。Vitest でテストする中心。`data/` のパラメータを**注入されて**計算する。
 - `data/` … シナリオ別の初期条件・市況パラメータ・イベント・会計定数（出典コメント付き）。`types.ts`（集約型）＋ `<シナリオ>.ts`（定数）＋ `index.ts`（レジストリ `getScenario`/`AVAILABLE_SCENARIOS`）の構成。
 - `app/` … React の UI（財務諸表ダッシュボード・経営判断パネル・指標表示）。`core/` を呼ぶだけにし、計算は UI に書かない。
 

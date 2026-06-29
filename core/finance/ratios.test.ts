@@ -4,7 +4,7 @@ import { computeRatios } from './ratios'
 
 // 資産合計 = 負債合計 + 純資産合計 = 1,000 になる例。
 const bs: BalanceSheet = {
-  currentAssets: { cash: 300, accountsReceivable: 100, inventory: 200 }, // 流動資産 600
+  currentAssets: { cash: 300, accountsReceivable: 100, rawMaterials: 120, finishedGoods: 80 }, // 流動資産 600
   fixedAssets: { equipment: 400 }, // 総資産 1,000
   currentLiabilities: { accountsPayable: 100, shortTermDebt: 200 }, // 流動負債 300
   nonCurrentLiabilities: { longTermDebt: 100 }, // 負債合計 400

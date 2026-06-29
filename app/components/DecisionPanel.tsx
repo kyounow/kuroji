@@ -54,11 +54,18 @@ export function DecisionPanel({ decision, onChange, onPlay, onReset, disabled }:
           hint="上げると利益率↑だが数量↓"
         />
         <Field
+          label="原材料の仕入数量"
+          value={decision.purchaseMaterials}
+          onChange={(v) => onChange({ purchaseMaterials: v })}
+          step={50}
+          hint="スポット価格で購入・在庫に"
+        />
+        <Field
           label="生産数量"
           value={decision.produceUnits}
           onChange={(v) => onChange({ produceUnits: v })}
           step={50}
-          hint="売れ残りは在庫に"
+          hint="手持ち原材料が上限"
         />
         <Field
           label="販促費"

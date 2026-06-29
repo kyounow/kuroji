@@ -16,7 +16,10 @@ function safeDiv(numerator: number, denominator: number): number {
  */
 export function computeRatios(bs: BalanceSheet, pl: IncomeStatement): Ratios {
   const currentAssets =
-    bs.currentAssets.cash + bs.currentAssets.accountsReceivable + bs.currentAssets.inventory
+    bs.currentAssets.cash +
+    bs.currentAssets.accountsReceivable +
+    bs.currentAssets.rawMaterials +
+    bs.currentAssets.finishedGoods
   const currentLiabilities =
     bs.currentLiabilities.accountsPayable + bs.currentLiabilities.shortTermDebt
 

@@ -12,13 +12,17 @@ export const defaultScenario: Scenario = {
     '現金と最低限の設備を持つ小さな会社を経営する。価格と投資、資金繰りを判断しながら黒字経営を目指す。',
   initialState: {
     turn: 0,
-    inventoryUnits: 1_000, // 在庫 1,000,000 円 ÷ 基準原価 1,000 円 = 1,000 個
+    // 棚卸資産は基準単価 1,000 円で評価: 原材料 500個=500,000 円 / 製品 500個=500,000 円
+    materialUnits: 500,
+    finishedUnits: 500,
+    materialIndex: 1.0,
     rdStock: 0,
     balanceSheet: {
       currentAssets: {
         cash: 5_000_000,
         accountsReceivable: 0,
-        inventory: 1_000_000,
+        rawMaterials: 500_000,
+        finishedGoods: 500_000,
       },
       fixedAssets: {
         equipment: 4_000_000,
@@ -41,8 +45,10 @@ export const defaultScenario: Scenario = {
     baseDemand: 1_000,
     basePrice: 2_000,
     priceElasticity: 1.2,
-    // コスト
+    // コスト・原材料
     unitVariableCost: 1_000,
+    materialVolatility: 0.15,
+    materialMeanReversion: 0.3,
     fixedCosts: 500_000,
     depreciationRate: 0.1,
     // 発生主義（売掛・買掛）

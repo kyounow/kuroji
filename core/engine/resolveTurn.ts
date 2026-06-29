@@ -17,20 +17,20 @@ export function marketingMultiplier(spend: number, params: SimParams): number {
 }
 
 /**
- * 1ターン（1会計期間）を解決する純粋関数。発生主義の簡易モデル。
+ * 1ターン（1会計期間）を解決する純粋関数。発生主義＋原材料インベントリの簡易モデル。
  *
- * モデルの要点（学習用に簡略化）:
- *   - 在庫: 期首在庫＋当期生産のうち需要分だけ販売。売れ残りは在庫として繰越。
- *           評価は移動平均法。売上原価 = 販売数量 × 移動平均単価（費用収益対応）。
- *   - 研究開発: 累積R&D（rdStock）に応じて製造原価が下がり需要が上がる（productFromRd）。
- *               当期のR&D費は費用計上し、その成果（rdStock 増加）は翌期以降に効く。
- *   - 売掛金: 当期売上の一部（salesOnCreditRatio）は期末に売掛金として残り、現金は翌期回収。
- *   - 買掛金: 当期仕入（生産費）の一部（payableRatio）は期末に買掛金として残り、現金は翌期支払。
- *   - 減価償却: 期首の固定資産簿価に対して計上（当期取得分は翌期から）。非現金。
+ * 物理フロー（数量と金額の両方を移動平均で管理）:
+ *   ①原材料の仕入（当期スポット単価 × 数量）→ 原材料在庫へ（数量↑・金額↑）
+ *   ②生産：手持ち原材料を上限に produce 個。原材料を移動平均単価で消費し、
+ *     その金額を製品在庫へ「価値保存の振替」（資産の再分類＝恒等式不変）
+ *   ③販売：需要分を製品在庫から販売。売上原価は製品の移動平均単価
  *
- * 在庫の増減は常に ΔInv = 生産費 − 売上原価 に等しいので、
- * 「営業 CF = 純利益 + 減価償却 − ΔAR − Δ在庫 + ΔAP」が成立し、
- * 期末の会計恒等式（資産 = 負債 + 純資産）が常に保たれる（数値はすべて整数円）。
+ * スポット単価 = unitVariableCost × materialIndex × product.unitCostModifier
+ *   （市況 materialIndex と R&D の原価改善 unitCostModifier を反映）
+ *
+ * 売掛/買掛（買掛は当期の原材料仕入に対して）、減価償却、支払利息、法人税は従来どおり。
+ * 棚卸資産の増減は常に「仕入＋振替−売上原価」で閉じ、
+ * 「営業 CF = 純利益 + 減価償却 − ΔAR − Δ棚卸 + ΔAP」が成立、会計恒等式を常に維持。
  */
 export function resolveTurn(
   state: CompanyState,
@@ -39,19 +39,40 @@ export function resolveTurn(
   options: TurnOptions = {},
 ): TurnResult {
   const bs = state.balanceSheet
-
-  // --- 製品パラメータ（期首時点の累積R&Dで決まる） ---
   const product = productFromRd(state.rdStock, params)
-  const effectiveUnitCost = Math.max(0, Math.round(params.unitVariableCost * product.unitCostModifier))
+
+  // 当期の原材料スポット単価（市況 × R&D 原価改善）
+  const spotCost = Math.max(
+    0,
+    Math.round(params.unitVariableCost * state.materialIndex * product.unitCostModifier),
+  )
 
   // 期首残高
   const cashBegin = bs.currentAssets.cash
   const arBegin = bs.currentAssets.accountsReceivable
-  const invValueBegin = bs.currentAssets.inventory
-  const invUnitsBegin = Math.max(0, state.inventoryUnits)
+  const rawValBegin = bs.currentAssets.rawMaterials
+  const finValBegin = bs.currentAssets.finishedGoods
+  const rawUnitsBegin = Math.max(0, state.materialUnits)
+  const finUnitsBegin = Math.max(0, state.finishedUnits)
   const apBegin = bs.currentLiabilities.accountsPayable
 
-  // --- 需要と販売（在庫は移動平均で評価） ---
+  // --- ① 原材料の仕入（スポット単価で原材料在庫へ、移動平均） ---
+  const purchaseUnits = Math.max(0, decision.purchaseMaterials)
+  const purchaseCost = spotCost * purchaseUnits
+  const rawUnitsAfterBuy = rawUnitsBegin + purchaseUnits
+  const rawValAfterBuy = rawValBegin + purchaseCost
+  const rawAvg = rawUnitsAfterBuy > 0 ? rawValAfterBuy / rawUnitsAfterBuy : 0
+
+  // --- ② 生産（手持ち原材料が上限。原材料→製品へ価値保存の振替） ---
+  const produced = Math.min(Math.max(0, decision.produceUnits), rawUnitsAfterBuy)
+  const consumedRawValue = Math.round(produced * rawAvg)
+  const rawUnitsEnd = rawUnitsAfterBuy - produced
+  const rawValEnd = rawValAfterBuy - consumedRawValue
+  const finUnitsAfterProduce = finUnitsBegin + produced
+  const finValAfterProduce = finValBegin + consumedRawValue
+  const finAvg = finUnitsAfterProduce > 0 ? finValAfterProduce / finUnitsAfterProduce : 0
+
+  // --- ③ 需要と販売（製品在庫から） ---
   const demandMultiplier = options.demandMultiplier ?? 1
   const rawDemand = demandAt(decision.unitPrice, params)
   const demand = Math.max(
@@ -63,22 +84,14 @@ export function resolveTurn(
         product.demandModifier,
     ),
   )
-
-  const produce = Math.max(0, decision.produceUnits)
-  const productionCost = effectiveUnitCost * produce
-  const unitsAfterProduce = invUnitsBegin + produce
-  const valueAfterProduce = invValueBegin + productionCost
-  const avgCost = unitsAfterProduce > 0 ? valueAfterProduce / unitsAfterProduce : 0
-
-  const unitsSold = Math.min(demand, unitsAfterProduce)
-  const costOfGoodsSold = Math.round(unitsSold * avgCost)
-  const invUnitsEnd = unitsAfterProduce - unitsSold
-  const invValueEnd = valueAfterProduce - costOfGoodsSold // ΔInv = 生産費 − 売上原価 を保証
+  const unitsSold = Math.min(demand, finUnitsAfterProduce)
+  const revenue = Math.round(decision.unitPrice * unitsSold)
+  const costOfGoodsSold = Math.round(unitsSold * finAvg)
+  const finUnitsEnd = finUnitsAfterProduce - unitsSold
+  const finValEnd = finValAfterProduce - costOfGoodsSold
 
   // --- 損益計算書（P/L） ---
-  const revenue = Math.round(decision.unitPrice * unitsSold)
   const grossProfit = revenue - costOfGoodsSold
-
   const depreciation = Math.round(bs.fixedAssets.equipment * params.depreciationRate)
   const marketingSpend = Math.max(0, decision.marketingSpend)
   const rdSpend = Math.max(0, decision.rdSpend)
@@ -105,16 +118,16 @@ export function resolveTurn(
     netIncome,
   }
 
-  // --- 期末の資産・負債（発生主義） ---
+  // --- 期末の発生主義（売掛は売上、買掛は原材料仕入に対して） ---
   const arEnd = Math.round(revenue * params.salesOnCreditRatio)
-  const apEnd = Math.round(productionCost * params.payableRatio)
+  const apEnd = Math.round(purchaseCost * params.payableRatio)
 
   const deltaAR = arEnd - arBegin
-  const deltaInv = invValueEnd - invValueBegin
+  const deltaInventory = rawValEnd + finValEnd - (rawValBegin + finValBegin)
   const deltaAP = apEnd - apBegin
 
   // --- キャッシュ・フロー計算書（間接法・整合保証） ---
-  const operating = netIncome + depreciation - deltaAR - deltaInv + deltaAP
+  const operating = netIncome + depreciation - deltaAR - deltaInventory + deltaAP
   const investing = -decision.capitalExpenditure
   const financing = decision.financing
   const netChange = operating + investing + financing
@@ -132,13 +145,16 @@ export function resolveTurn(
   // --- 期末の貸借対照表（B/S）と状態 ---
   const nextState: CompanyState = {
     turn: state.turn + 1,
-    inventoryUnits: invUnitsEnd,
+    materialUnits: rawUnitsEnd,
+    finishedUnits: finUnitsEnd,
+    materialIndex: options.nextMaterialIndex ?? state.materialIndex,
     rdStock: state.rdStock + rdSpend,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,
         accountsReceivable: arEnd,
-        inventory: invValueEnd,
+        rawMaterials: rawValEnd,
+        finishedGoods: finValEnd,
       },
       fixedAssets: {
         equipment: bs.fixedAssets.equipment - depreciation + decision.capitalExpenditure,
@@ -157,5 +173,15 @@ export function resolveTurn(
     },
   }
 
-  return { state: nextState, incomeStatement, cashFlow, unitsSold, effectiveUnitCost, product }
+  return {
+    state: nextState,
+    incomeStatement,
+    cashFlow,
+    unitsSold,
+    effectiveUnitCost: spotCost,
+    product,
+    deltaAR,
+    deltaInventory,
+    deltaAP,
+  }
 }

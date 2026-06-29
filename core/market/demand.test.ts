@@ -7,6 +7,8 @@ const params: SimParams = {
   basePrice: 2_000,
   priceElasticity: 1.2,
   unitVariableCost: 1_000,
+  materialVolatility: 0.15,
+  materialMeanReversion: 0.3,
   fixedCosts: 500_000,
   depreciationRate: 0.1,
   salesOnCreditRatio: 0.4,

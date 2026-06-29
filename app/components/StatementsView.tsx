@@ -6,7 +6,7 @@ import {
   type CompanyState,
 } from '@core/index'
 import type { TurnRecord } from '../state'
-import { yen } from '../format'
+import { yen, num } from '../format'
 import { BalanceSheetChart } from './BalanceSheetChart'
 import { WaterfallChart, type WaterfallStep } from './WaterfallChart'
 
@@ -36,7 +36,10 @@ export function StatementsView({ state, last }: Props) {
 
   const bs = state.balanceSheet
   const currentAssets =
-    bs.currentAssets.cash + bs.currentAssets.accountsReceivable + bs.currentAssets.inventory
+    bs.currentAssets.cash +
+    bs.currentAssets.accountsReceivable +
+    bs.currentAssets.rawMaterials +
+    bs.currentAssets.finishedGoods
   const currentLiabilities =
     bs.currentLiabilities.accountsPayable + bs.currentLiabilities.shortTermDebt
 
@@ -75,7 +78,8 @@ export function StatementsView({ state, last }: Props) {
           <tr className="section"><th colSpan={2}>資産の部</th></tr>
           <Row label="現金" value={bs.currentAssets.cash} />
           <Row label="売掛金" value={bs.currentAssets.accountsReceivable} />
-          <Row label="在庫" value={bs.currentAssets.inventory} />
+          <Row label={`原材料（${num(state.materialUnits)}個）`} value={bs.currentAssets.rawMaterials} />
+          <Row label={`製品（${num(state.finishedUnits)}個）`} value={bs.currentAssets.finishedGoods} />
           <Row label="流動資産 計" value={currentAssets} kind="sub" />
           <Row label="設備（簿価）" value={bs.fixedAssets.equipment} />
           <Row label="資産合計" value={totalAssets(bs)} kind="total" />

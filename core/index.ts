@@ -17,6 +17,7 @@ export { totalAssets, totalLiabilities, totalEquity, balances } from './statemen
 export { demandAt } from './market/demand'
 export { computeRatios } from './finance/ratios'
 export { productFromRd } from './product/research'
+export { materialIndexNext } from './market/material'
 export { resolveTurn, marketingMultiplier } from './engine/resolveTurn'
 export { drawEvent } from './engine/events'
 export { createRng, hashUnit } from './util/rng'

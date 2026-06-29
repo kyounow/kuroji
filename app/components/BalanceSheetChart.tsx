@@ -12,8 +12,9 @@ export function BalanceSheetChart({ bs }: { bs: BalanceSheet }) {
   const assets: Segment[] = [
     { label: '現金', value: bs.currentAssets.cash, color: '#2f9e7f' },
     { label: '売掛金', value: bs.currentAssets.accountsReceivable, color: '#49b596' },
-    { label: '在庫', value: bs.currentAssets.inventory, color: '#76c9b0' },
-    { label: '設備', value: bs.fixedAssets.equipment, color: '#a3dbcb' },
+    { label: '原材料', value: bs.currentAssets.rawMaterials, color: '#69c2a6' },
+    { label: '製品', value: bs.currentAssets.finishedGoods, color: '#8fd2bf' },
+    { label: '設備', value: bs.fixedAssets.equipment, color: '#b5e0d3' },
   ]
   const liabEquity: Segment[] = [
     { label: '買掛金', value: bs.currentLiabilities.accountsPayable, color: '#e0875a' },

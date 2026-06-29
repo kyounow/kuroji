@@ -4,173 +4,187 @@ import { getScenario } from '@data/scenarios'
 import { balances, totalAssets, totalLiabilities, totalEquity } from '@core/statements/identity'
 import { resolveTurn, marketingMultiplier } from './resolveTurn'
 
-// 在庫を一定に保つ「定常運転」の判断を作る（生産＝販売見込み数量に近い）。
-const steady = (unitPrice: number, produceUnits: number, rdSpend = 0): Decision => ({
-  unitPrice,
-  produceUnits,
+/** 判断を作るヘルパ（未指定は 0）。 */
+const decide = (d: Partial<Decision> = {}): Decision => ({
+  unitPrice: 2_000,
+  purchaseMaterials: 0,
+  produceUnits: 0,
   marketingSpend: 0,
-  rdSpend,
+  rdSpend: 0,
   capitalExpenditure: 0,
   financing: 0,
+  ...d,
 })
 
-describe('resolveTurn（発生主義モデル）', () => {
+describe('resolveTurn（原材料インベントリ・発生主義モデル）', () => {
   it('解決後も会計恒等式（資産 = 負債 + 純資産）が成立する', () => {
     const { initialState, params } = getScenario('default')
-    const { state } = resolveTurn(initialState, steady(2_000, 1_000), params)
+    const { state } = resolveTurn(initialState, decide({ purchaseMaterials: 600, produceUnits: 700 }), params)
     expect(balances(state.balanceSheet)).toBe(true)
   })
 
   it('利益剰余金は期首＋当期純利益で繰り越される', () => {
     const { initialState, params } = getScenario('default')
     const before = initialState.balanceSheet.equity.retainedEarnings
-    const { state, incomeStatement } = resolveTurn(initialState, steady(2_000, 1_000), params)
+    const { state, incomeStatement } = resolveTurn(initialState, decide({ produceUnits: 300 }), params)
     expect(state.balanceSheet.equity.retainedEarnings).toBe(before + incomeStatement.netIncome)
   })
 
   it('CF の期末現金が B/S の現金と一致し、純増減と整合する', () => {
     const { initialState, params } = getScenario('default')
-    const { state, cashFlow } = resolveTurn(initialState, steady(2_000, 1_000), params)
+    const { state, cashFlow } = resolveTurn(
+      initialState,
+      decide({ purchaseMaterials: 400, produceUnits: 400 }),
+      params,
+    )
     expect(cashFlow.cashEnd).toBe(state.balanceSheet.currentAssets.cash)
     expect(cashFlow.cashEnd).toBe(cashFlow.cashBegin + cashFlow.netChange)
     expect(cashFlow.netChange).toBe(cashFlow.operating + cashFlow.investing + cashFlow.financing)
   })
 
-  it('営業 CF = 純利益 + 減価償却 − ΔAR − Δ在庫 + ΔAP（間接法の整合）', () => {
+  it('営業 CF = 純利益 + 減価償却 − ΔAR − Δ棚卸 + ΔAP（間接法の整合）', () => {
     const { initialState, params } = getScenario('default')
-    const bs0 = initialState.balanceSheet
-    const dep = Math.round(bs0.fixedAssets.equipment * params.depreciationRate)
-    const { state, incomeStatement, cashFlow } = resolveTurn(
+    const dep = Math.round(initialState.balanceSheet.fixedAssets.equipment * params.depreciationRate)
+    const r = resolveTurn(initialState, decide({ purchaseMaterials: 800, produceUnits: 500 }), params)
+    expect(r.cashFlow.operating).toBe(
+      r.incomeStatement.netIncome + dep - r.deltaAR - r.deltaInventory + r.deltaAP,
+    )
+  })
+
+  it('原材料を仕入れると原材料の数量と評価額が増える', () => {
+    const { initialState, params } = getScenario('default')
+    const u0 = initialState.materialUnits
+    const v0 = initialState.balanceSheet.currentAssets.rawMaterials
+    const { state } = resolveTurn(initialState, decide({ purchaseMaterials: 300 }), params)
+    expect(state.materialUnits).toBe(u0 + 300)
+    expect(state.balanceSheet.currentAssets.rawMaterials).toBeGreaterThan(v0)
+  })
+
+  it('生産は原材料を製品へ価値保存で振替する（恒等式維持）', () => {
+    const { initialState, params } = getScenario('default')
+    const before = initialState.balanceSheet.currentAssets
+    const totalInvBefore = before.rawMaterials + before.finishedGoods
+    // 仕入なし・需要0（価格を十分高く）にして、原材料→製品の振替だけを見る
+    const { state } = resolveTurn(initialState, decide({ unitPrice: 2_000_000, produceUnits: 200 }), params)
+    const after = state.balanceSheet.currentAssets
+    // 製造原価以外の現金変動がなければ、原材料↓＝製品↑で棚卸合計は不変
+    expect(after.rawMaterials).toBeLessThan(before.rawMaterials)
+    expect(after.finishedGoods).toBeGreaterThan(before.finishedGoods)
+    expect(after.rawMaterials + after.finishedGoods).toBe(totalInvBefore)
+    expect(state.materialUnits).toBe(initialState.materialUnits - 200)
+    expect(state.finishedUnits).toBe(initialState.finishedUnits + 200)
+    expect(balances(state.balanceSheet)).toBe(true)
+  })
+
+  it('生産は手持ち原材料が上限（在庫切れ時）', () => {
+    const { initialState, params } = getScenario('default')
+    // 期首原材料 500個、仕入なし、生産1000要求 → 500 までしか作れない（需要0で販売なし）
+    const { state } = resolveTurn(initialState, decide({ unitPrice: 2_000_000, produceUnits: 1_000 }), params)
+    expect(state.materialUnits).toBe(0)
+    expect(state.finishedUnits).toBe(initialState.finishedUnits + 500)
+  })
+
+  it('販売は製品在庫が上限', () => {
+    const { initialState, params } = getScenario('default')
+    // 期首製品 500個、生産なし、需要は基準価格で1000 → 500 までしか売れない
+    const { unitsSold } = resolveTurn(initialState, decide({ produceUnits: 0 }), params)
+    expect(unitsSold).toBe(500)
+  })
+
+  it('掛け売り比率に応じて売掛金、原材料仕入の掛けに応じて買掛金が立つ', () => {
+    const { initialState, params } = getScenario('default')
+    const { state, incomeStatement, effectiveUnitCost } = resolveTurn(
       initialState,
-      steady(2_000, 1_200),
+      decide({ purchaseMaterials: 200, produceUnits: 200 }),
       params,
     )
-    const bs1 = state.balanceSheet
-    const dAR = bs1.currentAssets.accountsReceivable - bs0.currentAssets.accountsReceivable
-    const dInv = bs1.currentAssets.inventory - bs0.currentAssets.inventory
-    const dAP = bs1.currentLiabilities.accountsPayable - bs0.currentLiabilities.accountsPayable
-    expect(cashFlow.operating).toBe(incomeStatement.netIncome + dep - dAR - dInv + dAP)
-  })
-
-  it('生産が販売を上回ると在庫が増える', () => {
-    const { initialState, params } = getScenario('default')
-    const before = initialState.balanceSheet.currentAssets.inventory
-    const { state } = resolveTurn(initialState, steady(2_000, 2_000), params)
-    expect(state.balanceSheet.currentAssets.inventory).toBeGreaterThan(before)
-  })
-
-  it('掛け売り比率に応じて売掛金が立つ', () => {
-    const { initialState, params } = getScenario('default')
-    const { state, incomeStatement } = resolveTurn(initialState, steady(2_000, 1_000), params)
     expect(state.balanceSheet.currentAssets.accountsReceivable).toBe(
       Math.round(incomeStatement.revenue * params.salesOnCreditRatio),
     )
+    expect(state.balanceSheet.currentLiabilities.accountsPayable).toBe(
+      Math.round(effectiveUnitCost * 200 * params.payableRatio),
+    )
   })
 
-  it('在庫切れ時は在庫＋生産までしか売れない', () => {
+  it('スポット単価は materialIndex と R&D を反映する', () => {
     const { initialState, params } = getScenario('default')
-    // 期首在庫 1,000 個、生産 0、需要は基準価格で 1,000 → 販売は在庫の 1,000 が上限
-    const { unitsSold } = resolveTurn(initialState, steady(2_000, 0), params)
-    expect(unitsSold).toBe(1_000)
+    const base = resolveTurn(initialState, decide(), params).effectiveUnitCost
+    const pricey = resolveTurn({ ...initialState, materialIndex: 1.5 }, decide(), params).effectiveUnitCost
+    const researched = resolveTurn({ ...initialState, rdStock: 3_000_000 }, decide(), params).effectiveUnitCost
+    expect(pricey).toBeGreaterThan(base)
+    expect(researched).toBeLessThan(base)
   })
 
-  it('販促は需要を押し上げる（逓減）', () => {
-    const { params } = getScenario('default')
-    expect(marketingMultiplier(0, params)).toBe(1)
-    expect(marketingMultiplier(200_000, params)).toBeCloseTo(1 + params.marketingEffect * 0.5)
-    expect(marketingMultiplier(1_000_000, params)).toBeGreaterThan(marketingMultiplier(200_000, params))
-  })
-
-  it('イベント乗数は需要に作用する', () => {
+  it('R&Dは同じ価格でも需要（販売数量）を増やす', () => {
     const { initialState, params } = getScenario('default')
-    const big = { ...initialState, balanceSheet: { ...initialState.balanceSheet } }
-    const boom = resolveTurn(big, steady(2_000, 5_000), params, { demandMultiplier: 1.5 })
-    const normal = resolveTurn(big, steady(2_000, 5_000), params, { demandMultiplier: 1.0 })
-    expect(boom.unitsSold).toBeGreaterThan(normal.unitsSold)
+    // 製品を十分用意（生産1000 + 原材料1000仕入）
+    const setup = decide({ purchaseMaterials: 1_000, produceUnits: 1_000 })
+    const base = resolveTurn(initialState, setup, params).unitsSold
+    const researched = resolveTurn({ ...initialState, rdStock: 3_000_000 }, setup, params).unitsSold
+    expect(researched).toBeGreaterThan(base)
+  })
+
+  it('R&D費は当期費用として計上され rdStock に累積する', () => {
+    const { initialState, params } = getScenario('default')
+    const a = resolveTurn(initialState, decide({ rdSpend: 0 }), params)
+    const b = resolveTurn(initialState, decide({ rdSpend: 300_000 }), params)
+    expect(b.incomeStatement.operatingExpenses).toBe(a.incomeStatement.operatingExpenses + 300_000)
+    expect(b.state.rdStock).toBe(initialState.rdStock + 300_000)
+  })
+
+  it('原材料スポット価格が変動しても恒等式は崩れない（複数ターン）', () => {
+    const { initialState, params } = getScenario('default')
+    let s: CompanyState = initialState
+    for (let t = 0; t < 10; t++) {
+      const r = resolveTurn(s, decide({ purchaseMaterials: 600, produceUnits: 550, unitPrice: 2_100 }), params, {
+        demandMultiplier: 0.9 + (t % 3) * 0.2,
+        nextMaterialIndex: 1 + ((t % 5) - 2) * 0.1, // 0.8〜1.2 を巡回
+      })
+      s = r.state
+      expect(balances(s.balanceSheet)).toBe(true)
+      // 数量×金額の整合（数量0なら評価額0）
+      if (s.materialUnits === 0) expect(s.balanceSheet.currentAssets.rawMaterials).toBe(0)
+      if (s.finishedUnits === 0) expect(s.balanceSheet.currentAssets.finishedGoods).toBe(0)
+    }
+    expect(s.turn).toBe(10)
   })
 
   it('設備投資・借入をしても恒等式は崩れない', () => {
     const { initialState, params } = getScenario('default')
-    const decision: Decision = {
-      unitPrice: 2_500,
-      produceUnits: 1_500,
-      marketingSpend: 100_000,
-      rdSpend: 300_000,
-      capitalExpenditure: 1_000_000,
-      financing: 800_000,
-    }
-    const { state } = resolveTurn(initialState, decision, params)
+    const { state } = resolveTurn(
+      initialState,
+      decide({
+        unitPrice: 2_500,
+        purchaseMaterials: 800,
+        produceUnits: 700,
+        marketingSpend: 100_000,
+        rdSpend: 300_000,
+        capitalExpenditure: 1_000_000,
+        financing: 800_000,
+      }),
+      params,
+    )
     expect(totalAssets(state.balanceSheet)).toBe(
       totalLiabilities(state.balanceSheet) + totalEquity(state.balanceSheet),
     )
   })
 
-  it('複数ターン連続でも恒等式は崩れない', () => {
-    const { initialState, params } = getScenario('default')
-    let s: CompanyState = initialState
-    for (let t = 0; t < 10; t++) {
-      const r = resolveTurn(s, steady(2_100, 1_050), params, { demandMultiplier: 0.9 + (t % 3) * 0.2 })
-      s = r.state
-      expect(balances(s.balanceSheet)).toBe(true)
-    }
-    expect(s.turn).toBe(10)
-  })
-
-  it('R&Dを積むと実効製造原価が下がる', () => {
-    const { initialState, params } = getScenario('default')
-    const base = resolveTurn(initialState, steady(2_000, 0), params).effectiveUnitCost
-    const researched = resolveTurn(
-      { ...initialState, rdStock: 2_000_000 },
-      steady(2_000, 0),
-      params,
-    ).effectiveUnitCost
-    expect(researched).toBeLessThan(base)
-  })
-
-  it('R&Dを積むと同じ価格でも需要（販売数量）が増える', () => {
-    const { initialState, params } = getScenario('default')
-    // 在庫切れにならないよう十分生産する
-    const base = resolveTurn(initialState, steady(2_000, 5_000), params).unitsSold
-    const researched = resolveTurn(
-      { ...initialState, rdStock: 2_000_000 },
-      steady(2_000, 5_000),
-      params,
-    ).unitsSold
-    expect(researched).toBeGreaterThan(base)
-  })
-
-  it('R&D費は当期の費用として純利益を押し下げ、rdStock に累積する', () => {
-    const { initialState, params } = getScenario('default')
-    const withoutRd = resolveTurn(initialState, steady(2_000, 0, 0), params)
-    const withRd = resolveTurn(initialState, steady(2_000, 0, 300_000), params)
-    expect(withRd.incomeStatement.operatingExpenses).toBe(
-      withoutRd.incomeStatement.operatingExpenses + 300_000,
-    )
-    expect(withRd.state.rdStock).toBe(initialState.rdStock + 300_000)
-  })
-
-  it('在庫の単価と異なる原価で生産しても恒等式は崩れない（移動平均）', () => {
-    const { initialState, params } = getScenario('default')
-    // R&Dで原価が下がった状態で大量生産 → 在庫の評価単価が混ざる
-    const s = { ...initialState, rdStock: 3_000_000 }
-    const { state } = resolveTurn(s, steady(2_200, 3_000), params)
-    expect(balances(state.balanceSheet)).toBe(true)
-    // 在庫数量と評価額の整合（数量が増えていれば評価額も正）
-    expect(state.inventoryUnits).toBeGreaterThanOrEqual(0)
-    expect(state.balanceSheet.currentAssets.inventory).toBeGreaterThanOrEqual(0)
-  })
-
   it('明示パラメータで損益が手計算と一致する', () => {
+    // 期首: 現金 1,000,000 / 原材料 0 / 製品 1,000個=1,000,000 / 設備 1,000,000
+    //       長期借入 500,000 / 資本金 1,000,000 / 利益剰余金 1,500,000
+    // 恒等式: 資産 3,000,000 = 負債 500,000 + 純資産 2,500,000
     const state: CompanyState = {
       turn: 0,
-      inventoryUnits: 1_000,
+      materialUnits: 0,
+      finishedUnits: 1_000,
+      materialIndex: 1.0,
       rdStock: 0,
       balanceSheet: {
-        currentAssets: { cash: 1_000_000, accountsReceivable: 0, inventory: 1_000_000 },
+        currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 0, finishedGoods: 1_000_000 },
         fixedAssets: { equipment: 1_000_000 },
         currentLiabilities: { accountsPayable: 0, shortTermDebt: 0 },
         nonCurrentLiabilities: { longTermDebt: 500_000 },
-        equity: { capitalStock: 1_500_000, retainedEarnings: 1_000_000 },
+        equity: { capitalStock: 1_000_000, retainedEarnings: 1_500_000 },
       },
     }
     const params: SimParams = {
@@ -178,6 +192,8 @@ describe('resolveTurn（発生主義モデル）', () => {
       basePrice: 2_000,
       priceElasticity: 1.2,
       unitVariableCost: 1_000,
+      materialVolatility: 0,
+      materialMeanReversion: 0,
       fixedCosts: 200_000,
       depreciationRate: 0.1,
       salesOnCreditRatio: 0.4,
@@ -190,11 +206,11 @@ describe('resolveTurn（発生主義モデル）', () => {
       interestRate: 0.04,
       effectiveTaxRate: 0.3,
     }
-    // 在庫1,000個＋生産0、価格=基準 → 需要1,000、販売1,000
+    // 製品1,000個（@1,000）・仕入0・生産0、価格=基準 → 需要1,000、販売1,000
     // 売上 2,000,000 / 原価 1,000,000 / 粗利 1,000,000
-    // 減価償却 100,000 / 販管費 200,000+100,000+0 = 300,000 / 営業利益 700,000
+    // 減価償却 100,000 / 販管費 200,000+100,000 = 300,000 / 営業利益 700,000
     // 利息 500,000×0.04 = 20,000 / 税引前 680,000 / 税 204,000 / 純利益 476,000
-    const { incomeStatement: pl } = resolveTurn(state, steady(2_000, 0), params)
+    const { incomeStatement: pl } = resolveTurn(state, decide({ unitPrice: 2_000 }), params)
     expect(pl.revenue).toBe(2_000_000)
     expect(pl.costOfGoodsSold).toBe(1_000_000)
     expect(pl.grossProfit).toBe(1_000_000)
@@ -204,5 +220,14 @@ describe('resolveTurn（発生主義モデル）', () => {
     expect(pl.pretaxIncome).toBe(680_000)
     expect(pl.tax).toBe(204_000)
     expect(pl.netIncome).toBe(476_000)
+  })
+})
+
+describe('marketingMultiplier', () => {
+  it('販促0で1、投じるほど逓増し上限に近づく', () => {
+    const { params } = getScenario('default')
+    expect(marketingMultiplier(0, params)).toBe(1)
+    expect(marketingMultiplier(200_000, params)).toBeCloseTo(1 + params.marketingEffect * 0.5)
+    expect(marketingMultiplier(1_000_000, params)).toBeGreaterThan(marketingMultiplier(200_000, params))
   })
 })

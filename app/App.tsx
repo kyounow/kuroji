@@ -8,13 +8,14 @@ import { StatementsView } from './components/StatementsView'
 import { RatiosView } from './components/RatiosView'
 import { HistoryTable } from './components/HistoryTable'
 import { HistoryChart } from './components/HistoryChart'
-import { yen, yenSigned, pct } from './format'
+import { yen, yenSigned, pct, num } from './format'
 
 export function App() {
   const { game, scenario, play, reset, upcomingEvent } = useGame()
 
   const [decision, setDecision] = useState<Decision>({
     unitPrice: scenario.params.basePrice,
+    purchaseMaterials: scenario.params.baseDemand,
     produceUnits: scenario.params.baseDemand,
     marketingSpend: 0,
     rdSpend: 0,
@@ -35,7 +36,10 @@ export function App() {
 
   // 現在の累積R&Dから決まる製品パラメータ（次の期に適用される）。
   const product = productFromRd(game.current.rdStock, scenario.params)
-  const effectiveCost = Math.round(scenario.params.unitVariableCost * product.unitCostModifier)
+  // 当期の原材料スポット単価（市況指数 × R&D 原価改善）。
+  const spotCost = Math.round(
+    scenario.params.unitVariableCost * game.current.materialIndex * product.unitCostModifier,
+  )
 
   return (
     <main className="app">
@@ -70,19 +74,27 @@ export function App() {
       <EventBanner event={upcomingEvent} />
 
       <section className="product">
-        <h2>製品の状態（研究開発の成果）</h2>
+        <h2>製品・原材料の状態</h2>
         <div className="product-grid">
           <div className="metric">
-            <div className="metric-value">{yen(effectiveCost)}</div>
-            <div className="metric-label">実効製造原価/個（基準 {yen(scenario.params.unitVariableCost)}）</div>
+            <div className="metric-value">{yen(spotCost)}</div>
+            <div className="metric-label">原材料スポット単価/個（基準 {yen(scenario.params.unitVariableCost)}）</div>
           </div>
           <div className="metric">
-            <div className="metric-value">−{pct(1 - product.unitCostModifier)}</div>
-            <div className="metric-label">原価削減率</div>
+            <div className="metric-value">{(game.current.materialIndex).toFixed(2)}</div>
+            <div className="metric-label">原材料価格指数（1.0=基準）</div>
           </div>
           <div className="metric">
-            <div className="metric-value">+{pct(product.demandModifier - 1)}</div>
-            <div className="metric-label">需要押し上げ</div>
+            <div className="metric-value">{num(game.current.materialUnits)}個</div>
+            <div className="metric-label">原材料 在庫</div>
+          </div>
+          <div className="metric">
+            <div className="metric-value">{num(game.current.finishedUnits)}個</div>
+            <div className="metric-label">製品 在庫</div>
+          </div>
+          <div className="metric">
+            <div className="metric-value">−{pct(1 - product.unitCostModifier)} / +{pct(product.demandModifier - 1)}</div>
+            <div className="metric-label">R&D 原価減 / 需要増</div>
           </div>
           <div className="metric">
             <div className="metric-value">{yen(game.current.rdStock)}</div>
@@ -90,7 +102,8 @@ export function App() {
           </div>
         </div>
         <p className="muted small">
-          研究開発費を投じるほど、製造原価が下がり需要が上がります（効果は逓減し、翌期以降に反映）。
+          原材料を仕入れて在庫し、生産で製品へ。原材料価格は市況で変動（安い時に仕込むと有利）。
+          研究開発は実効原価を下げ需要を上げます（逓減・翌期以降に反映）。
         </p>
       </section>
 

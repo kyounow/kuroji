@@ -3,11 +3,14 @@
 
 /** 貸借対照表（B/S）。資産 = 負債 + 純資産 が常に成立すること。 */
 export interface BalanceSheet {
-  /** 流動資産（現金・売掛金・在庫 など） */
+  /** 流動資産（現金・売掛金・棚卸資産 など） */
   currentAssets: {
     cash: number
     accountsReceivable: number
-    inventory: number
+    /** 原材料の評価額（移動平均法。数量は CompanyState.materialUnits） */
+    rawMaterials: number
+    /** 製品の評価額（移動平均法。数量は CompanyState.finishedUnits） */
+    finishedGoods: number
   }
   /** 固定資産（設備など、減価償却後の簿価） */
   fixedAssets: {
@@ -47,8 +50,12 @@ export interface CompanyState {
   /** 経過ターン数（会計期間の通し番号、0 始まり） */
   turn: number
   balanceSheet: BalanceSheet
-  /** 在庫の数量。評価額は balanceSheet.currentAssets.inventory（移動平均法で評価）。 */
-  inventoryUnits: number
+  /** 原材料の数量。評価額は balanceSheet.currentAssets.rawMaterials（移動平均法）。 */
+  materialUnits: number
+  /** 製品の数量。評価額は balanceSheet.currentAssets.finishedGoods（移動平均法）。 */
+  finishedUnits: number
+  /** 原材料スポット価格の指数（1.0 = 基準）。次ターンへ持ち越す。 */
+  materialIndex: number
   /** 累積の研究開発投資。製品パラメータ（製造原価・需要）を規定する。 */
   rdStock: number
 }
@@ -65,7 +72,9 @@ export interface ProductState {
 export interface Decision {
   /** 販売価格（単価） */
   unitPrice: number
-  /** 当期の生産（仕入）数量。売れ残りは在庫になる。 */
+  /** 当期の原材料の仕入数量（当期スポット価格で購入し、原材料在庫に積む）。 */
+  purchaseMaterials: number
+  /** 当期の生産数量。手持ち原材料が上限。製品在庫に積む。 */
   produceUnits: number
   /** 販促費（需要を押し上げるが費用になる） */
   marketingSpend: number
@@ -92,6 +101,8 @@ export interface MarketEvent {
 export interface TurnOptions {
   /** 当期の需要乗数（イベント由来。既定 1.0） */
   demandMultiplier?: number
+  /** 次ターンへ持ち越す原材料スポット価格指数（既定は当期の materialIndex を維持＝変動なし）。 */
+  nextMaterialIndex?: number
 }
 
 /**
@@ -123,10 +134,14 @@ export interface TurnResult {
   cashFlow: CashFlowStatement
   /** 販売数量 */
   unitsSold: number
-  /** 当期に適用された実効製造原価（R&D 反映後の1個あたり原価） */
+  /** 当期の原材料スポット単価（R&D・市況反映後の1個あたり仕入原価） */
   effectiveUnitCost: number
   /** 当期に適用された製品パラメータ */
   product: ProductState
+  /** 当期の運転資本・棚卸の増減（間接法CFの内訳・診断に使用） */
+  deltaAR: number
+  deltaInventory: number
+  deltaAP: number
 }
 
 /**
@@ -142,9 +157,13 @@ export interface SimParams {
   /** 価格弾力性（価格1%上昇あたりの需要減少率の目安） */
   priceElasticity: number
 
-  // --- コスト ---
-  /** 1個あたり変動費（仕入原価） */
+  // --- コスト・原材料 ---
+  /** 原材料の基準単価（1製品あたり原材料1単位を消費。スポット価格の基準） */
   unitVariableCost: number
+  /** 原材料スポット価格のボラティリティ（変動の大きさ 0..1 程度） */
+  materialVolatility: number
+  /** 原材料スポット価格の平均回帰の強さ（0..1。大きいほど1.0へ戻りやすい） */
+  materialMeanReversion: number
   /** 期間固定費（販管費の現金支出分） */
   fixedCosts: number
   /** 減価償却率（期首の固定資産簿価に対する割合） */
