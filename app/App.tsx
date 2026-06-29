@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Decision } from '@core/index'
 import { totalEquity } from '@core/index'
 import { useGame } from './state'
@@ -6,6 +6,7 @@ import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
 import { StatementsView } from './components/StatementsView'
 import { RatiosView } from './components/RatiosView'
+import { HistoryTable } from './components/HistoryTable'
 import { HistoryChart } from './components/HistoryChart'
 import { yen, yenSigned } from './format'
 
@@ -21,7 +22,13 @@ export function App() {
   })
   const patch = (p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p }))
 
-  const last = game.history.length ? game.history[game.history.length - 1] : null
+  // 表示中の期（既定は最新。過去の期をクリックすると切り替わる）。
+  const [selectedTurn, setSelectedTurn] = useState(0)
+  useEffect(() => {
+    setSelectedTurn(game.history.length)
+  }, [game.history.length])
+  const selected = selectedTurn > 0 ? game.history[selectedTurn - 1] : null
+
   const equity = totalEquity(game.current.balanceSheet)
   const startEquity = totalEquity(scenario.initialState.balanceSheet)
 
@@ -65,9 +72,15 @@ export function App() {
         disabled={game.gameOver}
       />
 
-      <RatiosView ratios={last ? last.ratios : null} />
+      <HistoryTable
+        history={game.history}
+        selectedTurn={selectedTurn}
+        onSelect={setSelectedTurn}
+      />
 
-      <StatementsView state={game.current} last={last} />
+      <RatiosView ratios={selected ? selected.ratios : null} turn={selected?.turn} />
+
+      <StatementsView state={selected ? selected.stateAfter : game.current} last={selected} />
 
       <HistoryChart initial={scenario.initialState} history={game.history} />
 

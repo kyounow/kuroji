@@ -278,6 +278,50 @@ button.ghost {
   border-bottom: none;
 }
 
+/* 履歴テーブル */
+.table-scroll {
+  overflow-x: auto;
+}
+
+table.history {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 640px;
+  font-variant-numeric: tabular-nums;
+}
+
+table.history th,
+table.history td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.history thead th {
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-bottom: 2px solid var(--border);
+}
+
+table.history .r {
+  text-align: right;
+}
+
+table.history tbody tr {
+  cursor: pointer;
+}
+
+table.history tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+table.history tbody tr.selected {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* グラフ */
 .chart {
   width: 100%;
