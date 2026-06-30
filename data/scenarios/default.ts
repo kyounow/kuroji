@@ -52,6 +52,8 @@ export const defaultScenario: Scenario = {
     // 保険
     insuranceRefCost: 30_000,
     maxInsuranceCoverage: 0.8,
+    maintenanceRefCost: 30_000, // この保全費で最大軽減に到達
+    maxMaintenanceReduction: 0.7, // 予防保全で設備故障の被害を最大70%軽減
     // 研究開発
     rdCostReductionMax: 0.4,
     rdDemandBoostMax: 0.5,

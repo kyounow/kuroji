@@ -128,7 +128,9 @@ export function resolveTurn(
   const marketingSpend = Math.max(0, decision.marketingSpend)
   const rdSpend = Math.max(0, decision.rdSpend)
   const insuranceSpend = Math.max(0, decision.insuranceSpend)
-  const operatingExpenses = fixedCosts + depreciation + marketingSpend + rdSpend + insuranceSpend
+  const maintenanceSpend = Math.max(0, decision.maintenanceSpend)
+  const operatingExpenses =
+    fixedCosts + depreciation + marketingSpend + rdSpend + insuranceSpend + maintenanceSpend
   const operatingIncome = grossProfit - operatingExpenses
 
   // 実効金利＝政策金利（マクロ）＋銀行スプレッド＋信用スプレッド（期首の財務状態で評価）。
@@ -155,8 +157,14 @@ export function resolveTurn(
   }
 
   // 設備毀損（故障・災害）: 期首設備簿価×係数（ストックなので ppy 非依存）。下限 floor。
-  const equipFloor = Math.max(0, options.equipmentLoss ?? 0)
-  const equipScaled = (options.equipmentLossRatio ?? 0) * bs.fixedAssets.equipment
+  // 保全費（予防保全）で被害を最大 maxMaintenanceReduction まで軽減する（連動・floor の両方に作用）。
+  const maintenanceEffect =
+    params.maintenanceRefCost && params.maintenanceRefCost > 0
+      ? Math.min(params.maxMaintenanceReduction ?? 0, maintenanceSpend / params.maintenanceRefCost)
+      : 0
+  const maintenanceKeep = 1 - maintenanceEffect
+  const equipFloor = Math.max(0, options.equipmentLoss ?? 0) * maintenanceKeep
+  const equipScaled = (options.equipmentLossRatio ?? 0) * bs.fixedAssets.equipment * maintenanceKeep
   const rawEquipmentLoss = Math.max(equipFloor, Math.round(equipScaled * severity))
   // 設備の毀損は減価償却後の簿価まで（同期の償却と二重控除でマイナスにしない）。
   const equipmentWritedown = Math.min(rawEquipmentLoss, Math.max(0, bs.fixedAssets.equipment - depreciation))

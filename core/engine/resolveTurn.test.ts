@@ -11,6 +11,7 @@ const decide = (d: Partial<Decision> = {}): Decision => ({
   marketingSpend: 0,
   rdSpend: 0,
   insuranceSpend: 0,
+  maintenanceSpend: 0,
   capitalExpenditure: 0,
   financing: 0,
   ...d,
@@ -397,6 +398,27 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     })
     expect(mid.shockEquipmentWritedown).toBe(Math.round(4_000_000 * 0.1)) // severity未指定=1
     expect(heavy.shockEquipmentWritedown).toBe(Math.round(4_000_000 * 0.1 * 1.5))
+  })
+
+  it('保全費は設備故障の被害を軽減し、費用として計上される（恒等式維持）', () => {
+    const params: SimParams = { ...BASE_PARAMS, maintenanceRefCost: 30_000, maxMaintenanceReduction: 0.7 }
+    const opts = { equipmentLossRatio: 0.13, equipmentLoss: 40_000 }
+    const none = resolveTurn(BASE_STATE, decide({ produceUnits: 0 }), params, opts)
+    // 保全費 21,000 = 30,000×0.7 で最大軽減(70%)。設備故障の被害が 30% に。
+    const maint = resolveTurn(BASE_STATE, decide({ produceUnits: 0, maintenanceSpend: 21_000 }), params, opts)
+    expect(maint.shockEquipmentWritedown).toBe(Math.round(none.shockEquipmentWritedown * 0.3))
+    // 保全費は販管費に乗る（営業利益が保全費分だけ下がる）
+    expect(maint.incomeStatement.operatingExpenses - none.incomeStatement.operatingExpenses).toBe(21_000)
+    expect(balances(maint.state.balanceSheet)).toBe(true)
+  })
+
+  it('保全費の軽減率は上限（maxMaintenanceReduction）で頭打ち', () => {
+    const params: SimParams = { ...BASE_PARAMS, maintenanceRefCost: 30_000, maxMaintenanceReduction: 0.7 }
+    const opts = { equipmentLossRatio: 0.13 }
+    const none = resolveTurn(BASE_STATE, decide({ produceUnits: 0 }), params, opts)
+    // 大金を投じても削減は70%まで（被害は最低でも30%残る）
+    const huge = resolveTurn(BASE_STATE, decide({ produceUnits: 0, maintenanceSpend: 9_999_999 }), params, opts)
+    expect(huge.shockEquipmentWritedown).toBe(Math.round(none.shockEquipmentWritedown * 0.3))
   })
 
   it('後方互換: 比率未指定なら floor(絶対額)がそのまま損失になる', () => {

@@ -31,8 +31,9 @@ export const defaultEvents: EventTable = [
     event: { id: 'viral', label: '話題沸騰', description: 'SNSで話題になり需要が急増。', demandMultiplier: 1.5 },
   },
   // --- 突発ショック（保険でヘッジ可能。損失は会社規模に連動。数値は学習用サンプル・出典なし） ---
+  // weight は控えめ（各月 約3%）。月次プレイで頻発しすぎないよう市況イベントより低く設定。
   {
-    weight: 1,
+    weight: 0.4,
     event: {
       id: 'breakdown',
       label: '設備故障',
@@ -45,7 +46,7 @@ export const defaultEvents: EventTable = [
     },
   },
   {
-    weight: 1,
+    weight: 0.4,
     event: {
       id: 'lawsuit',
       label: '訴訟・賠償',
@@ -60,7 +61,7 @@ export const defaultEvents: EventTable = [
     },
   },
   {
-    weight: 1,
+    weight: 0.4,
     event: {
       id: 'recall',
       label: 'リコール',

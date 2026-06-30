@@ -46,6 +46,8 @@ export const cafeScenario: Scenario = {
     marketingHalf: 30_000,
     insuranceRefCost: 20_000,
     maxInsuranceCoverage: 0.8,
+    maintenanceRefCost: 20_000,
+    maxMaintenanceReduction: 0.7,
     rdCostReductionMax: 0.2,
     rdDemandBoostMax: 0.6,
     rdHalf: 200_000,

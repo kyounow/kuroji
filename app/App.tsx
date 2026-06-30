@@ -41,6 +41,7 @@ export function App() {
     marketingSpend: 0,
     rdSpend: 0,
     insuranceSpend: 0,
+    maintenanceSpend: 0,
     capitalExpenditure: 0,
     financing: 0,
   })
@@ -55,6 +56,7 @@ export function App() {
       marketingSpend: 0,
       rdSpend: 0,
       insuranceSpend: 0,
+      maintenanceSpend: 0,
       capitalExpenditure: 0,
       financing: 0,
     })
@@ -319,6 +321,8 @@ export function App() {
         equipmentLabel={equipmentLabel}
         insuranceRefCost={scenario.params.insuranceRefCost}
         maxInsuranceCoverage={scenario.params.maxInsuranceCoverage}
+        maintenanceRefCost={scenario.params.maintenanceRefCost}
+        maxMaintenanceReduction={scenario.params.maxMaintenanceReduction}
       />
 
       {!gameOver && (

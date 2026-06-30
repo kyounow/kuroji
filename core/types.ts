@@ -83,6 +83,8 @@ export interface Decision {
   rdSpend: number
   /** 保険料（毎期支払う費用。突発ショックの損失を一部ヘッジする） */
   insuranceSpend: number
+  /** 保全・点検費（毎期支払う費用。予防保全で設備故障の被害を抑える） */
+  maintenanceSpend: number
   /** 設備投資額 */
   capitalExpenditure: number
   /** 新規借入額（マイナスは返済） */
@@ -266,6 +268,12 @@ export interface SimParams {
   insuranceRefCost: number
   /** 保険の最大補償率（0..1。例 0.8 = 損失の最大80%をヘッジ） */
   maxInsuranceCoverage: number
+
+  // --- 保全（設備故障の予防保全） ---
+  /** 最大の保全効果を得るのに必要な保全費（この額で maxMaintenanceReduction に到達。未設定で保全無効） */
+  maintenanceRefCost?: number
+  /** 保全による設備故障の被害の最大削減率（0..1。例 0.7 = 故障被害を最大70%軽減） */
+  maxMaintenanceReduction?: number
 
   // --- 研究開発（製品パラメータ） ---
   /** 累積R&Dによる製造原価の最大削減率（例 0.4 = 最大−40%） */

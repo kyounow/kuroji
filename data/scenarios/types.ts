@@ -35,5 +35,6 @@ export type DecisionField =
   | 'marketingSpend'
   | 'rdSpend'
   | 'insuranceSpend'
+  | 'maintenanceSpend'
   | 'capitalExpenditure'
   | 'financing'
