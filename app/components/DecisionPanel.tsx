@@ -23,6 +23,10 @@ interface Props {
   /** 業種別ラベル */
   capacityLabel: string
   equipmentLabel: string
+  /** 保険: 満額補償に必要な保険料 */
+  insuranceRefCost: number
+  /** 保険: 補償率の上限（例 0.8） */
+  maxInsuranceCoverage: number
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -99,8 +103,13 @@ export function DecisionPanel({
   capacity,
   capacityLabel,
   equipmentLabel,
+  insuranceRefCost,
+  maxInsuranceCoverage,
 }: Props) {
   const purchaseCost = materialUnitCost * Math.max(0, decision.purchaseMaterials)
+  const insuranceCoverage =
+    insuranceRefCost > 0 ? Math.min(maxInsuranceCoverage, decision.insuranceSpend / insuranceRefCost) : 0
+  const fullPremium = Math.ceil(insuranceRefCost * maxInsuranceCoverage)
   const visible = FIELDS.filter((f) => !enabled || enabled.includes(f.key))
   const capText = Number.isFinite(capacity) ? `${Math.round(capacity).toLocaleString('ja-JP')}個/月` : '無制限'
 
@@ -111,6 +120,8 @@ export function DecisionPanel({
   const hintFor = (f: FieldDef): string => {
     if (f.key === 'purchaseMaterials') return `単価 ${yen(materialUnitCost)}/個 → 仕入額 ${yen(purchaseCost)}`
     if (f.key === 'produceUnits') return `${capacityLabel}の上限 ${capText}まで`
+    if (f.key === 'insuranceSpend')
+      return `補償率 ${pct(insuranceCoverage)}（満額 ${yen(fullPremium)} で最大 ${pct(maxInsuranceCoverage)}。ショック損失をこの率だけ肩代わり）`
     if (f.key === 'capitalExpenditure') return `${equipmentLabel}↑→${capacityLabel}↑・製造原価↓`
     if (f.key === 'financing') return `格付${creditGrade}・借入上限 ${yen(borrowLimit)}・金利 ${pct(effectiveRate)}`
     return f.hint

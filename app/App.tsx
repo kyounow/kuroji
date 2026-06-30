@@ -229,7 +229,7 @@ export function App() {
 
       {gameOver && score && <ScoreCard score={score} best={best} won={game.outcome === 'won'} />}
 
-      <EventBanner event={upcomingEvent} />
+      <EventBanner event={upcomingEvent} insuranceCoverage={preview.insuranceCoverage} />
 
       <MacroPanel macro={game.macro} effectiveRate={effectiveRate} />
 
@@ -312,6 +312,8 @@ export function App() {
         capacity={capacity}
         capacityLabel={capacityLabel}
         equipmentLabel={equipmentLabel}
+        insuranceRefCost={scenario.params.insuranceRefCost}
+        maxInsuranceCoverage={scenario.params.maxInsuranceCoverage}
       />
 
       {!gameOver && (
