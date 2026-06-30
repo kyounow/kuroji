@@ -16,6 +16,7 @@ const decide = (d: Partial<Decision> = {}): Decision => ({
   hire: 0,
   fire: 0,
   wageLevel: 100,
+  equityIssuance: 0,
   financing: 0,
   ...d,
 })
@@ -204,6 +205,36 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
       if (s.finishedUnits === 0) expect(s.balanceSheet.currentAssets.finishedGoods).toBe(0)
     }
     expect(s.turn).toBe(10)
+  })
+
+  it('増資は現金と資本金を同額増やし、財務CFに乗り、恒等式を保つ', () => {
+    const { initialState, params } = base()
+    const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
+    const r = resolveTurn(state, decide({ produceUnits: 0, equityIssuance: 500_000 }), params)
+    // 資本金 +500,000、現金は財務CFに +500,000 反映
+    expect(r.state.balanceSheet.equity.capitalStock).toBe(state.balanceSheet.equity.capitalStock + 500_000)
+    expect(r.cashFlow.financing).toBe(500_000)
+    expect(r.cashFlow.cashEnd).toBe(r.state.balanceSheet.currentAssets.cash)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('増資で発行済株数が増える（簿価発行・希薄化）', () => {
+    const { initialState, params } = base()
+    // 純資産7,000,000・1,000株 → BVPS 7,000。350万円増資 → 500株発行 → 1,500株。
+    const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
+    const equityBegin = totalEquity(state.balanceSheet) // 7,000,000
+    const r = resolveTurn(state, decide({ produceUnits: 0, equityIssuance: equityBegin / 2 }), params)
+    expect(r.state.sharesOutstanding).toBe(1_500) // +500株（半額分）
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('増資と借入は別の財務調達だが、合算で財務CF＝Δcash 整合', () => {
+    const { initialState, params } = base()
+    const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
+    const r = resolveTurn(state, decide({ produceUnits: 0, equityIssuance: 200_000, financing: 300_000 }), params)
+    expect(r.cashFlow.financing).toBe(500_000) // 借入300,000＋増資200,000
+    expect(r.state.balanceSheet.equity.capitalStock).toBe(state.balanceSheet.equity.capitalStock + 200_000)
+    expect(balances(r.state.balanceSheet)).toBe(true)
   })
 
   it('設備投資・借入をしても恒等式は崩れない', () => {

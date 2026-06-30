@@ -20,6 +20,7 @@ import { HistoryTable } from './components/HistoryTable'
 import { HistoryChart } from './components/HistoryChart'
 import { MacroPanel } from './components/MacroPanel'
 import { ForecastPanel } from './components/ForecastPanel'
+import { CapitalPanel } from './components/CapitalPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SettingsModal } from './components/SettingsModal'
 import { loadBest, saveBest } from './storage'
@@ -47,6 +48,7 @@ export function App() {
     hire: 0,
     fire: 0,
     wageLevel: 100,
+    equityIssuance: 0,
     financing: 0,
   })
   const patch = useCallback((p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p })), [])
@@ -65,6 +67,7 @@ export function App() {
       hire: 0,
       fire: 0,
       wageLevel: 100,
+      equityIssuance: 0,
       financing: 0,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -373,6 +376,8 @@ export function App() {
         inflationIndex={game.macro.inflationIndex}
         attritionSlope={scenario.params.attritionSlope}
         maxAttrition={scenario.params.maxAttrition}
+        equity={equity}
+        sharesOutstanding={game.current.sharesOutstanding}
       />
 
       {!gameOver && (
@@ -395,6 +400,18 @@ export function App() {
         turn={selected?.turn}
         periodsPerYear={ppy}
       />
+
+      {game.current.sharesOutstanding != null && (
+        <CapitalPanel
+          sharesOutstanding={game.current.sharesOutstanding}
+          equity={equity}
+          lastNetIncome={
+            game.history.length > 0
+              ? game.history[game.history.length - 1].incomeStatement.netIncome
+              : null
+          }
+        />
+      )}
 
       <StatementsView
         state={selected ? selected.stateAfter : game.current}

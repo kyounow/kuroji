@@ -17,6 +17,7 @@ export const startupScenario: Scenario = {
     rdStock: 0,
     headcount: 4, // エンジニア4人。労働＝処理能力。4×60/年=240/年=月20（サーバー処理能力と同じ）
     condition: 1,
+    sharesOutstanding: 1_000, // 創業株式1,000株
     balanceSheet: {
       currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 50_000, finishedGoods: 0 },
       fixedAssets: { equipment: 200_000 },

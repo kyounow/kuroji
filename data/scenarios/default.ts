@@ -19,6 +19,7 @@ export const defaultScenario: Scenario = {
     rdStock: 0,
     headcount: 5, // 創業メンバー5人。労働能力 5×120/年=600/年=月50（設備能力と同じ＝両方がボトルネック）
     condition: 1,
+    sharesOutstanding: 1_000, // 創業株式1,000株（純資産99万 → 1株あたり約990円）
     balanceSheet: {
       currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 60_000, finishedGoods: 30_000 },
       fixedAssets: { equipment: 300_000 },

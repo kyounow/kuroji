@@ -63,6 +63,8 @@ export interface CompanyState {
   condition?: number
   /** 従業員数。人件費（給与）と労働による生産能力を規定する。未設定は 0。 */
   headcount?: number
+  /** 発行済株式数。増資・M&A・上場で増える。EPS・1株あたり純資産・希薄化の基準。未設定は 0。 */
+  sharesOutstanding?: number
 }
 
 /** 研究開発の成果として変化する製品パラメータ。 */
@@ -97,6 +99,8 @@ export interface Decision {
   fire: number
   /** 給与水準（％。相場＝物価連動の市場賃金＝100）。低いと人件費は下がるが離職率が上がる。 */
   wageLevel: number
+  /** 増資額（株式発行。現金↑・資本金↑。無利息だが株数が増え1株価値が薄まる＝希薄化） */
+  equityIssuance: number
   /** 新規借入額（マイナスは返済） */
   financing: number
 }

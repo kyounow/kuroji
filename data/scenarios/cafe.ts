@@ -17,6 +17,7 @@ export const cafeScenario: Scenario = {
     rdStock: 0,
     headcount: 8, // スタッフ8人。労働＝接客（来客キャパ）。8×375/年=3,000/年=月250（店舗キャパと同じ）
     condition: 1,
+    sharesOutstanding: 1_000, // 創業株式1,000株
     balanceSheet: {
       currentAssets: { cash: 500_000, accountsReceivable: 0, rawMaterials: 20_000, finishedGoods: 10_000 },
       fixedAssets: { equipment: 400_000 },

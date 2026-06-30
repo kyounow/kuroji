@@ -11,6 +11,7 @@ import { demandAt } from '@core/market/demand'
 import { productFromRd } from '@core/product/research'
 import { assessCredit } from '@core/finance/credit'
 import { productionCapacity, laborCapacity, costEfficiency } from '@core/finance/capacity'
+import { sharesIssued } from '@core/finance/shares'
 
 /** 0..1 にクランプ。 */
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
@@ -244,17 +245,24 @@ export function resolveTurn(
       ? Math.min(decision.financing, credit.borrowLimit)
       : Math.max(decision.financing, -bs.nonCurrentLiabilities.longTermDebt)
 
+  // 増資（株式発行）: 現金↑・資本金↑（無利息・返済義務なし）。借入とは別の財務CF。
+  // 簿価発行（発行価格＝期首BVPS）で新株を発行し、希薄化として株数に反映。
+  const equityIssue = Math.max(0, decision.equityIssuance)
+  const equityBegin = bs.equity.capitalStock + bs.equity.retainedEarnings
+  const newShares = sharesIssued(equityIssue, equityBegin, state.sharesOutstanding ?? 0)
+
   // 非現金の設備減（減価償却＋設備毀損）を足し戻す。保険補償分の現金は netIncome 経由で流入。
   const nonCashEquipReduction = depreciation + equipmentWritedown
   const operating = netIncome + nonCashEquipReduction - deltaAR - deltaInventory + deltaAP
   const investing = -decision.capitalExpenditure
-  const netChange = operating + investing + financing
+  const financingCF = financing + equityIssue // 借入＋増資（株式発行）
+  const netChange = operating + investing + financingCF
   const cashEnd = cashBegin + netChange
 
   const cashFlow: CashFlowStatement = {
     operating,
     investing,
-    financing,
+    financing: financingCF,
     netChange,
     cashBegin,
     cashEnd,
@@ -283,6 +291,7 @@ export function resolveTurn(
     rdStock: state.rdStock + rdSpend,
     condition: conditionNext,
     headcount,
+    sharesOutstanding: (state.sharesOutstanding ?? 0) + newShares,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,
@@ -301,7 +310,7 @@ export function resolveTurn(
         longTermDebt: bs.nonCurrentLiabilities.longTermDebt + financing,
       },
       equity: {
-        capitalStock: bs.equity.capitalStock,
+        capitalStock: bs.equity.capitalStock + equityIssue,
         retainedEarnings: bs.equity.retainedEarnings + netIncome,
       },
     },

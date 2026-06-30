@@ -40,4 +40,5 @@ export type DecisionField =
   | 'hire'
   | 'fire'
   | 'wageLevel'
+  | 'equityIssuance'
   | 'financing'
