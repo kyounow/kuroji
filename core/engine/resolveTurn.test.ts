@@ -237,6 +237,14 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(balances(r.state.balanceSheet)).toBe(true)
   })
 
+  it('株式未設定のシナリオは増資0で sharesOutstanding を未設定のまま保つ（後方互換）', () => {
+    const { initialState, params } = base()
+    // initialState は sharesOutstanding を持たない（undefined）
+    const r = resolveTurn(initialState, decide({ produceUnits: 0 }), params)
+    expect(initialState.sharesOutstanding).toBeUndefined()
+    expect(r.state.sharesOutstanding).toBeUndefined() // 0 に変わらない
+  })
+
   it('設備投資・借入をしても恒等式は崩れない', () => {
     const { initialState, params } = base()
     const { state } = resolveTurn(

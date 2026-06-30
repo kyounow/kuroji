@@ -291,7 +291,11 @@ export function resolveTurn(
     rdStock: state.rdStock + rdSpend,
     condition: conditionNext,
     headcount,
-    sharesOutstanding: (state.sharesOutstanding ?? 0) + newShares,
+    // 株式が未設定のシナリオ（チュートリアル等）は未設定のまま保つ（後方互換）。
+    sharesOutstanding:
+      state.sharesOutstanding == null && newShares === 0
+        ? undefined
+        : (state.sharesOutstanding ?? 0) + newShares,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,

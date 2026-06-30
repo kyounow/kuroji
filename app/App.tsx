@@ -401,7 +401,7 @@ export function App() {
         periodsPerYear={ppy}
       />
 
-      {game.current.sharesOutstanding != null && (
+      {game.current.sharesOutstanding != null && game.current.sharesOutstanding > 0 && (
         <CapitalPanel
           sharesOutstanding={game.current.sharesOutstanding}
           equity={equity}
