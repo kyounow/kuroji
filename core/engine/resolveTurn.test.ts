@@ -295,6 +295,120 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     )
   })
 
+  // --- 規模連動ショック（設備故障＝設備簿価、訴訟＝売上＋利益、毀損度ばらつき severity） ---
+  /** equipment を変えても恒等式を保つ残高（差額を現金で調整。資産=負債+純資産=10,000,000）。 */
+  const withEquipment = (equipment: number): CompanyState => ({
+    ...BASE_STATE,
+    balanceSheet: {
+      ...BASE_STATE.balanceSheet,
+      currentAssets: { ...BASE_STATE.balanceSheet.currentAssets, cash: 9_000_000 - equipment },
+      fixedAssets: { equipment },
+    },
+  })
+
+  it('設備故障は設備簿価に比例する（規模連動）', () => {
+    const { params } = base()
+    const opts = { equipmentLossRatio: 0.13, equipmentLoss: 40_000 }
+    const big = resolveTurn(withEquipment(4_000_000), decide({ produceUnits: 0 }), params, opts)
+    const mid = resolveTurn(withEquipment(1_000_000), decide({ produceUnits: 0 }), params, opts)
+    expect(big.shockEquipmentWritedown).toBe(Math.round(4_000_000 * 0.13)) // 520,000
+    expect(mid.shockEquipmentWritedown).toBe(Math.round(1_000_000 * 0.13)) // 130,000
+    expect(big.shockEquipmentWritedown).toBeGreaterThan(mid.shockEquipmentWritedown)
+    expect(balances(big.state.balanceSheet)).toBe(true)
+  })
+
+  it('小規模では設備故障の下限(floor)が効く', () => {
+    const { params } = base()
+    const r = resolveTurn(withEquipment(100_000), decide({ produceUnits: 0 }), params, {
+      equipmentLossRatio: 0.13, // 0.13×100,000=13,000 < floor 40,000
+      equipmentLoss: 40_000,
+    })
+    expect(r.shockEquipmentWritedown).toBe(40_000)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('設備毀損は規模連動でも簿価を超えず、設備をマイナスにしない（クリップ）', () => {
+    const { params } = base()
+    const r = resolveTurn(withEquipment(50_000), decide({ produceUnits: 0 }), params, {
+      equipmentLoss: 100_000, // floor が簿価超
+      equipmentLossRatio: 0.13,
+    })
+    expect(r.shockEquipmentWritedown).toBeLessThan(100_000) // 簿価クリップが優先
+    expect(r.state.balanceSheet.fixedAssets.equipment).toBeGreaterThanOrEqual(0)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('訴訟は売上規模に連動する（年換算売上×係数）', () => {
+    const { initialState, params } = base()
+    const r = resolveTurn(initialState, decide({ unitPrice: 2_000 }), params, {
+      oneOffLossRevenueRatio: 0.5,
+    })
+    const annualRev = r.incomeStatement.revenue * (params.periodsPerYear ?? 1)
+    expect(r.shockOneOffLoss).toBe(Math.round(0.5 * annualRev))
+    expect(r.shockOneOffLoss).toBeGreaterThan(0)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('訴訟は利益にも連動し、赤字なら利益項は0（売上項のみ）', () => {
+    const { initialState } = base()
+    // 黒字: 固定費・減価償却を消して必ず営業黒字に
+    const profitParams: SimParams = { ...BASE_PARAMS, fixedCosts: 0, depreciationRate: 0 }
+    const revOnly = resolveTurn(initialState, decide({ unitPrice: 2_000 }), profitParams, {
+      oneOffLossRevenueRatio: 0.09,
+    })
+    const withProfit = resolveTurn(initialState, decide({ unitPrice: 2_000 }), profitParams, {
+      oneOffLossRevenueRatio: 0.09,
+      oneOffLossProfitRatio: 0.2,
+    })
+    expect(revOnly.incomeStatement.operatingIncome).toBeGreaterThan(0)
+    expect(withProfit.shockOneOffLoss).toBeGreaterThan(revOnly.shockOneOffLoss)
+
+    // 赤字: 需要0（高すぎる価格）で売上0・営業赤字 → 利益項0、floorのみ
+    const lossParams: SimParams = { ...BASE_PARAMS, fixedCosts: 5_000_000 }
+    const red = resolveTurn(initialState, decide({ unitPrice: 9_999_999, produceUnits: 0 }), lossParams, {
+      oneOffLoss: 50_000,
+      oneOffLossRevenueRatio: 0.09,
+      oneOffLossProfitRatio: 0.2,
+    })
+    expect(red.incomeStatement.operatingIncome).toBeLessThan(0)
+    expect(red.shockOneOffLoss).toBe(50_000) // 売上0＋利益項0 → floor
+    expect(balances(red.state.balanceSheet)).toBe(true)
+  })
+
+  it('訴訟の上限(cap)で一時損失が年商比に抑えられる（floor優先）', () => {
+    const { initialState, params } = base()
+    const r = resolveTurn(initialState, decide({ unitPrice: 2_000 }), params, {
+      oneOffLossRevenueRatio: 5.0, // 過大
+      oneOffLossCapRatio: 0.6,
+    })
+    const annualRev = r.incomeStatement.revenue * (params.periodsPerYear ?? 1)
+    expect(r.shockOneOffLoss).toBe(Math.round(0.6 * annualRev)) // cap でクリップ
+    expect(r.shockOneOffLoss).toBeLessThan(Math.round(5.0 * annualRev))
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('毀損度 severity は連動損失に乗る（未指定=中心値1）', () => {
+    const { initialState, params } = base()
+    const opts = { equipmentLossRatio: 0.1 } // floor 0
+    const mid = resolveTurn(initialState, decide({ produceUnits: 0 }), params, opts)
+    const heavy = resolveTurn(initialState, decide({ produceUnits: 0 }), params, {
+      ...opts,
+      lossSeverity: 1.5,
+    })
+    expect(mid.shockEquipmentWritedown).toBe(Math.round(4_000_000 * 0.1)) // severity未指定=1
+    expect(heavy.shockEquipmentWritedown).toBe(Math.round(4_000_000 * 0.1 * 1.5))
+  })
+
+  it('後方互換: 比率未指定なら floor(絶対額)がそのまま損失になる', () => {
+    const { initialState, params } = base()
+    const r = resolveTurn(initialState, decide({ produceUnits: 0 }), params, {
+      oneOffLoss: 700_000,
+      equipmentLoss: 300_000,
+    })
+    expect(r.shockOneOffLoss).toBe(700_000)
+    expect(r.shockEquipmentWritedown).toBe(300_000)
+  })
+
   it('生産能力が生産数量の上限になる（設備に比例）', () => {
     const { initialState, params } = base()
     // 年間能力 = 設備4,000,000 × 0.0006 = 2,400 → 月次 = floor(2400/12) = 200

@@ -137,6 +137,10 @@ function turnOptionsFor(game: GameState, decision: Decision): TurnOptions {
     nextMaterialIndex,
     oneOffLoss: event.oneOffLoss,
     equipmentLoss: event.equipmentLoss,
+    oneOffLossRevenueRatio: event.oneOffLossRevenueRatio,
+    oneOffLossProfitRatio: event.oneOffLossProfitRatio,
+    oneOffLossCapRatio: event.oneOffLossCapRatio,
+    equipmentLossRatio: event.equipmentLossRatio,
     demandShareMultiplier,
     policyRate: game.macro.policyRate,
     inflationIndex: game.macro.inflationIndex,
@@ -157,6 +161,17 @@ function demandNoiseFor(game: GameState): number {
   return 1 + (hashUnit(game.seed ^ 0x2b3c4d, game.current.turn) * 2 - 1) * sigma
 }
 
+/** 確定時のみ適用するショック毀損度（軽微〜大破）。決定論だがプレビューは中心値（=1）。 */
+function lossSeverityFor(game: GameState): number {
+  const scenario = getScenario(game.scenarioId)
+  const event = drawEvent(getEventTable(scenario.eventTableId), game.seed, game.current.turn)
+  const range = event.lossSeverityRange
+  if (!range) return 1
+  const [lo, hi] = range
+  // demandNoise(0x2b3c4d) とは別ソルトで相関を避ける。
+  return lo + (hi - lo) * hashUnit(game.seed ^ 0x5e7a17, game.current.turn)
+}
+
 function reducer(game: GameState, action: Action): GameState {
   switch (action.type) {
     case 'select':
@@ -173,6 +188,7 @@ function reducer(game: GameState, action: Action): GameState {
       const result = resolveTurn(game.current, action.decision, scenario.params, {
         ...turnOptionsFor(game, action.decision),
         demandNoise: demandNoiseFor(game), // 確定時のみ需要ブレを適用（プレビューには出さない）
+        lossSeverity: lossSeverityFor(game), // 確定時のみショック毀損度を適用（プレビューは中心値）
       })
       const nextMacro = advanceMacro(game.macro, scenario.params, game.seed, game.current.turn)
       const record: TurnRecord = {

@@ -98,10 +98,21 @@ export interface MarketEvent {
   description: string
   /** 需要に掛ける乗数（1.0 で平常） */
   demandMultiplier: number
-  /** 一時的な現金損失（訴訟・リコール等。保険でヘッジ可能） */
+  /** 一時的な現金損失の固定額（訴訟・リコール等。保険でヘッジ可能。規模連動時は下限 floor として作用） */
   oneOffLoss?: number
-  /** 設備の毀損額（故障・災害等。簿価から控除。保険でヘッジ可能） */
+  /** 設備の毀損額の固定額（故障・災害等。簿価から控除。規模連動時は下限 floor として作用） */
   equipmentLoss?: number
+  // --- 規模連動（任意。未指定なら従来の固定額のみで動作＝後方互換） ---
+  /** 年換算売上（revenue×ppy）に掛ける一時損失係数（訴訟・リコール） */
+  oneOffLossRevenueRatio?: number
+  /** 年換算営業利益 max(0,operatingIncome)×ppy に掛ける一時損失係数（訴訟。黒字ほど賠償増） */
+  oneOffLossProfitRatio?: number
+  /** 一時損失の上限を年換算売上比で（暴走・一撃倒産ガード。任意） */
+  oneOffLossCapRatio?: number
+  /** 期首設備簿価に掛ける設備毀損係数（故障・災害） */
+  equipmentLossRatio?: number
+  /** 毀損度のばらつき（軽微〜大破）の決定論レンジ。未指定で [1,1]＝ばらつき無し */
+  lossSeverityRange?: [number, number]
 }
 
 /** resolveTurn に渡す追加オプション（イベントなど）。 */
@@ -110,10 +121,20 @@ export interface TurnOptions {
   demandMultiplier?: number
   /** 次ターンへ持ち越す原材料スポット価格指数（既定は当期の materialIndex を維持＝変動なし）。 */
   nextMaterialIndex?: number
-  /** 当期の突発ショックによる一時的現金損失（保険適用前） */
+  /** 当期の突発ショックによる一時的現金損失（保険適用前。規模連動時は下限 floor） */
   oneOffLoss?: number
-  /** 当期の突発ショックによる設備毀損額（保険適用前） */
+  /** 当期の突発ショックによる設備毀損額（保険適用前。規模連動時は下限 floor） */
   equipmentLoss?: number
+  /** 年換算売上に掛ける一時損失係数（訴訟・リコール） */
+  oneOffLossRevenueRatio?: number
+  /** 年換算営業利益に掛ける一時損失係数（訴訟） */
+  oneOffLossProfitRatio?: number
+  /** 一時損失の年商比上限（任意の暴走ガード） */
+  oneOffLossCapRatio?: number
+  /** 期首設備簿価に掛ける設備毀損係数（故障・災害） */
+  equipmentLossRatio?: number
+  /** 当期の毀損度倍率（確定時のみ state が注入。未指定＝1で中心値＝プレビュー。demandNoise と同流儀） */
+  lossSeverity?: number
   /** 競合との市場シェアに由来する需要倍率（既定 1.0） */
   demandShareMultiplier?: number
   /** 当期の政策金利（マクロ由来。実効金利＝政策金利＋スプレッド＋信用スプレッド。既定 0） */
@@ -175,6 +196,10 @@ export interface TurnResult {
   appliedFinancing: number
   /** 当期の保険補償率（0..1） */
   insuranceCoverage: number
+  /** 当期に算出された一時損失（保険前 gross。floor/cap/severity 適用後。バナーの見込み額に使う） */
+  shockOneOffLoss: number
+  /** 当期に算出された設備毀損（保険前 gross。簿価クリップ後。バナーの見込み額に使う） */
+  shockEquipmentWritedown: number
   /** 当期の生産能力（数量上限。無制限なら Infinity） */
   capacity: number
 }

@@ -5,21 +5,32 @@ import { pct, yen } from '../format'
 export function EventBanner({
   event,
   insuranceCoverage = 0,
+  shockOneOffLoss,
+  shockEquipmentWritedown,
 }: {
   event: MarketEvent
   /** 現在の保険料での補償率（0..1）。ショック時の自己負担表示に使う。 */
   insuranceCoverage?: number
+  /** 当期の見込み一時損失（preview 由来・規模連動）。未指定ならイベントの固定額にフォールバック。 */
+  shockOneOffLoss?: number
+  /** 当期の見込み設備毀損（preview 由来・規模連動）。未指定ならイベントの固定額にフォールバック。 */
+  shockEquipmentWritedown?: number
 }) {
   const delta = event.demandMultiplier - 1
-  const shockLoss = (event.oneOffLoss ?? 0) + (event.equipmentLoss ?? 0)
+  // 規模連動の見込み額（preview）優先。無ければイベント定義の固定額にフォールバック（後方互換）。
+  const oneOff = shockOneOffLoss ?? event.oneOffLoss ?? 0
+  const equip = shockEquipmentWritedown ?? event.equipmentLoss ?? 0
+  const shockLoss = oneOff + equip
   const hasShock = shockLoss > 0
+  const scaled = shockOneOffLoss != null || shockEquipmentWritedown != null
+  const approx = scaled ? '約 ' : ''
   const tone = hasShock || delta < 0 ? 'bad' : delta > 0 ? 'good' : 'neutral'
 
   const effects: string[] = []
   if (delta > 0) effects.push('需要 +' + pct(delta))
   else if (delta < 0) effects.push('需要 −' + pct(-delta))
-  if (event.oneOffLoss) effects.push('一時損失 ' + yen(event.oneOffLoss))
-  if (event.equipmentLoss) effects.push('設備毀損 ' + yen(event.equipmentLoss))
+  if (oneOff > 0) effects.push('一時損失 ' + approx + yen(oneOff))
+  if (equip > 0) effects.push('設備毀損 ' + approx + yen(equip))
   if (effects.length === 0) effects.push('影響なし')
 
   // ショック損失のうち、現在の保険料で肩代わりされる額と自己負担。
@@ -31,15 +42,23 @@ export function EventBanner({
       <span className="event-label">今期の市況: {event.label}</span>
       <span className="event-desc">
         {event.description}（{effects.join('・')}）
-        {hasShock &&
-          (insuranceCoverage > 0 ? (
-            <span className="muted small">
-              {' '}
-              ※保険補償率 {pct(insuranceCoverage)} → 自己負担 {yen(selfBurden)}（保険が {yen(covered)} 肩代わり）
-            </span>
-          ) : (
-            <span className="muted small"> ※保険未加入＝全額自己負担。保険料を払うと損失を肩代わり</span>
-          ))}
+        {hasShock && (
+          <>
+            {insuranceCoverage > 0 ? (
+              <span className="muted small">
+                {' '}
+                ※保険補償率 {pct(insuranceCoverage)} → 自己負担 {approx}
+                {yen(selfBurden)}（保険が {approx}
+                {yen(covered)} 肩代わり）
+              </span>
+            ) : (
+              <span className="muted small"> ※保険未加入＝全額自己負担。保険料を払うと損失を肩代わり</span>
+            )}
+            {scaled && (
+              <span className="muted small"> ／ 規模・損傷度に応じた見込み額。確定時に前後します</span>
+            )}
+          </>
+        )}
       </span>
     </div>
   )

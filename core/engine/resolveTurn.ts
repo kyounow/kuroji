@@ -137,11 +137,29 @@ export function resolveTurn(
   const debt = bs.currentLiabilities.shortTermDebt + bs.nonCurrentLiabilities.longTermDebt
   const interestExpense = Math.round(debt * effectiveInterestRate * periodFactor)
 
-  // 突発ショック（保険で一部ヘッジ）。設備毀損は簿価から控除（非現金）。
-  const oneOffLoss = Math.max(0, options.oneOffLoss ?? 0)
-  const rawEquipmentLoss = Math.max(0, options.equipmentLoss ?? 0)
-  // 設備の毀損は手持ち簿価まで（マイナスにしない）。
-  const equipmentWritedown = Math.min(rawEquipmentLoss, bs.fixedAssets.equipment)
+  // 突発ショック（保険で一部ヘッジ）。損失額は会社規模に連動（比率×規模、絶対額は下限 floor）。
+  // 毀損度のばらつき severity は確定時のみ注入（プレビューは未指定＝1で中心値）。
+  const severity = Math.max(0, options.lossSeverity ?? 1)
+  const annualRevenue = revenue * ppy // 月次フロー→年商（係数を年額基準にしてppyに不変）
+  const annualOpInc = Math.max(0, operatingIncome) * ppy // 赤字は0クリップ（利益連動の上乗せ無し）
+
+  // 一時損失（訴訟・リコール）: 年商×係数 ＋ 年間営業利益×係数。下限 floor、任意の年商比 cap。
+  const oneOffFloor = Math.max(0, options.oneOffLoss ?? 0)
+  const oneOffScaled =
+    (options.oneOffLossRevenueRatio ?? 0) * annualRevenue +
+    (options.oneOffLossProfitRatio ?? 0) * annualOpInc
+  let oneOffLoss = Math.max(oneOffFloor, Math.round(oneOffScaled * severity))
+  if (options.oneOffLossCapRatio != null) {
+    const cap = Math.round(options.oneOffLossCapRatio * annualRevenue)
+    oneOffLoss = Math.max(oneOffFloor, Math.min(oneOffLoss, cap)) // floor は cap より優先（下限保証）
+  }
+
+  // 設備毀損（故障・災害）: 期首設備簿価×係数（ストックなので ppy 非依存）。下限 floor。
+  const equipFloor = Math.max(0, options.equipmentLoss ?? 0)
+  const equipScaled = (options.equipmentLossRatio ?? 0) * bs.fixedAssets.equipment
+  const rawEquipmentLoss = Math.max(equipFloor, Math.round(equipScaled * severity))
+  // 設備の毀損は減価償却後の簿価まで（同期の償却と二重控除でマイナスにしない）。
+  const equipmentWritedown = Math.min(rawEquipmentLoss, Math.max(0, bs.fixedAssets.equipment - depreciation))
   const insuranceCoverage =
     params.insuranceRefCost > 0
       ? Math.min(params.maxInsuranceCoverage, insuranceSpend / params.insuranceRefCost)
@@ -244,6 +262,8 @@ export function resolveTurn(
     effectiveInterestRate,
     appliedFinancing: financing,
     insuranceCoverage,
+    shockOneOffLoss: oneOffLoss,
+    shockEquipmentWritedown: equipmentWritedown,
     capacity,
   }
 }
