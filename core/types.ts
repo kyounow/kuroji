@@ -163,6 +163,8 @@ export interface TurnResult {
   appliedFinancing: number
   /** 当期の保険補償率（0..1） */
   insuranceCoverage: number
+  /** 当期の生産能力（数量上限。無制限なら Infinity） */
+  capacity: number
 }
 
 /**
@@ -183,6 +185,18 @@ export interface SimParams {
   priceElasticity: number
   /** 競合の強さ（0 = 競合なし。大きいほど競合が高品質で手強い） */
   competitorStrength: number
+
+  // --- 設備・生産能力（設備投資の効果） ---
+  /** 設備1円あたりの年間生産能力（数量）。未設定/0 は能力無制限。 */
+  capacityPerEquipment?: number
+  /** 設備規模による製造コストの最大低減率（規模の経済。未設定/0 で効果なし） */
+  scaleEconomyMax?: number
+  /** コスト低減が最大の半分になる設備規模 */
+  scaleEconomyHalf?: number
+  /** 表示用ラベル（業種別。既定「設備」） */
+  equipmentLabel?: string
+  /** 表示用ラベル（業種別。既定「生産能力」） */
+  capacityLabel?: string
 
   // --- コスト・原材料 ---
   /** 原材料の基準単価（1製品あたり原材料1単位を消費。スポット価格の基準） */

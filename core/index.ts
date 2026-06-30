@@ -19,6 +19,7 @@ export { totalAssets, totalLiabilities, totalEquity, balances } from './statemen
 export { demandAt } from './market/demand'
 export { computeRatios } from './finance/ratios'
 export { assessCredit, type CreditInfo, type CreditGrade } from './finance/credit'
+export { productionCapacity, costEfficiency } from './finance/capacity'
 export { productFromRd } from './product/research'
 export { materialIndexNext } from './market/material'
 export { competitorAt, shareMultiplier, marketShare, type Competitor } from './market/competitor'

@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Decision } from '@core/index'
-import { totalEquity, productFromRd, scoreGame, assessCredit, competitorAt, marketShare } from '@core/index'
+import {
+  totalEquity,
+  productFromRd,
+  scoreGame,
+  assessCredit,
+  competitorAt,
+  marketShare,
+  productionCapacity,
+  costEfficiency,
+} from '@core/index'
 import { useGame } from './state'
 import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
@@ -79,9 +88,12 @@ export function App() {
 
   // 現在の累積R&Dから決まる製品パラメータ（次の期に適用される）。
   const product = productFromRd(game.current.rdStock, scenario.params)
-  // 当期の原材料スポット単価（市況指数 × R&D 原価改善）。
+  // 当期の原材料スポット単価（市況指数 × R&D 原価改善 × 設備の規模の経済）。
   const spotCost = Math.round(
-    scenario.params.unitVariableCost * game.current.materialIndex * product.unitCostModifier,
+    scenario.params.unitVariableCost *
+      game.current.materialIndex *
+      product.unitCostModifier *
+      costEfficiency(game.current.balanceSheet.fixedAssets.equipment, scenario.params),
   )
 
   // 信用力（格付け・実効金利・借入枠）。期首の財務状態で評価。
@@ -99,6 +111,15 @@ export function App() {
         ? `${yearNo}年目 ${subNo}ヶ月目`
         : `第 ${game.current.turn + 1} 期`
   const unitName = ppy === 4 ? '四半期' : ppy === 12 ? 'ヶ月' : '期'
+
+  // 生産能力（設備に比例。当期の上限）。
+  const capacity = productionCapacity(
+    game.current.balanceSheet.fixedAssets.equipment,
+    scenario.params,
+    1 / ppy,
+  )
+  const equipmentLabel = scenario.params.equipmentLabel ?? '設備'
+  const capacityLabel = scenario.params.capacityLabel ?? '生産能力'
 
   // 競合・市場シェア（現在の販売価格・自社品質でのライブ試算）。
   const hasCompetitor = scenario.params.competitorStrength > 0
@@ -225,6 +246,14 @@ export function App() {
             <div className="metric-label">製品 在庫</div>
           </div>
           <div className="metric">
+            <div className="metric-value">
+              {Number.isFinite(capacity) ? `${num(capacity)}/月` : '無制限'}
+            </div>
+            <div className="metric-label">
+              {capacityLabel}（{equipmentLabel} {yen(game.current.balanceSheet.fixedAssets.equipment)}）
+            </div>
+          </div>
+          <div className="metric">
             <div className="metric-value">−{pct(1 - product.unitCostModifier)} / +{pct(product.demandModifier - 1)}</div>
             <div className="metric-label">R&D 原価減 / 需要増</div>
           </div>
@@ -273,6 +302,9 @@ export function App() {
         creditGrade={credit.grade}
         borrowLimit={credit.borrowLimit}
         effectiveRate={effectiveRate}
+        capacity={capacity}
+        capacityLabel={capacityLabel}
+        equipmentLabel={equipmentLabel}
       />
 
       <HistoryTable

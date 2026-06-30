@@ -10,6 +10,7 @@ import type {
 import { demandAt } from '@core/market/demand'
 import { productFromRd } from '@core/product/research'
 import { assessCredit } from '@core/finance/credit'
+import { productionCapacity, costEfficiency } from '@core/finance/capacity'
 
 /** 販促費から需要乗数を求める（逓減効果、上限あり）。 */
 export function marketingMultiplier(spend: number, params: SimParams): number {
@@ -45,11 +46,19 @@ export function resolveTurn(
   const ppy = params.periodsPerYear ?? 1
   const periodFactor = 1 / ppy
 
-  // 当期の原材料スポット単価（市況 × R&D 原価改善）
+  // 当期の原材料スポット単価（市況 × R&D 原価改善 × 設備の規模の経済）
   const spotCost = Math.max(
     0,
-    Math.round(params.unitVariableCost * state.materialIndex * product.unitCostModifier),
+    Math.round(
+      params.unitVariableCost *
+        state.materialIndex *
+        product.unitCostModifier *
+        costEfficiency(bs.fixedAssets.equipment, params),
+    ),
   )
+
+  // 当期の生産能力（設備に比例）。
+  const capacity = productionCapacity(bs.fixedAssets.equipment, params, periodFactor)
 
   // 期首残高
   const cashBegin = bs.currentAssets.cash
@@ -68,7 +77,8 @@ export function resolveTurn(
   const rawAvg = rawUnitsAfterBuy > 0 ? rawValAfterBuy / rawUnitsAfterBuy : 0
 
   // --- ② 生産（手持ち原材料が上限。原材料→製品へ価値保存の振替） ---
-  const produced = Math.min(Math.max(0, decision.produceUnits), rawUnitsAfterBuy)
+  // 生産は「希望数量・手持ち原材料・生産能力」のうち最小まで。
+  const produced = Math.min(Math.max(0, decision.produceUnits), rawUnitsAfterBuy, capacity)
   const consumedRawValue = Math.round(produced * rawAvg)
   const rawUnitsEnd = rawUnitsAfterBuy - produced
   const rawValEnd = rawValAfterBuy - consumedRawValue
@@ -219,5 +229,6 @@ export function resolveTurn(
     effectiveInterestRate,
     appliedFinancing: financing,
     insuranceCoverage,
+    capacity,
   }
 }

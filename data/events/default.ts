@@ -38,7 +38,7 @@ export const defaultEvents: EventTable = [
       label: '設備故障',
       description: '設備が故障し、簿価の一部が毀損した。',
       demandMultiplier: 1.0,
-      equipmentLoss: 600_000,
+      equipmentLoss: 40_000,
     },
   },
   {
@@ -48,7 +48,7 @@ export const defaultEvents: EventTable = [
       label: '訴訟・賠償',
       description: '思わぬ訴訟で賠償金が発生した。',
       demandMultiplier: 1.0,
-      oneOffLoss: 700_000,
+      oneOffLoss: 50_000,
     },
   },
   {
@@ -58,7 +58,7 @@ export const defaultEvents: EventTable = [
       label: 'リコール',
       description: '不具合でリコール。費用がかかり評判も落ちた。',
       demandMultiplier: 0.85,
-      oneOffLoss: 400_000,
+      oneOffLoss: 25_000,
     },
   },
 ]

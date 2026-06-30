@@ -18,6 +18,11 @@ interface Props {
   borrowLimit: number
   /** 実効金利 */
   effectiveRate: number
+  /** 当期の生産能力（数量上限。Infinity なら無制限） */
+  capacity: number
+  /** 業種別ラベル */
+  capacityLabel: string
+  equipmentLabel: string
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -88,12 +93,22 @@ export function DecisionPanel({
   creditGrade,
   borrowLimit,
   effectiveRate,
+  capacity,
+  capacityLabel,
+  equipmentLabel,
 }: Props) {
   const purchaseCost = materialUnitCost * Math.max(0, decision.purchaseMaterials)
   const visible = FIELDS.filter((f) => !enabled || enabled.includes(f.key))
+  const capText = Number.isFinite(capacity) ? `${Math.round(capacity).toLocaleString('ja-JP')}個/月` : '無制限'
 
+  const labelFor = (f: FieldDef): string => {
+    if (f.key === 'capitalExpenditure') return `${equipmentLabel}投資`
+    return f.label
+  }
   const hintFor = (f: FieldDef): string => {
     if (f.key === 'purchaseMaterials') return `単価 ${yen(materialUnitCost)}/個 → 仕入額 ${yen(purchaseCost)}`
+    if (f.key === 'produceUnits') return `${capacityLabel}の上限 ${capText}まで`
+    if (f.key === 'capitalExpenditure') return `${equipmentLabel}↑→${capacityLabel}↑・製造原価↓`
     if (f.key === 'financing') return `格付${creditGrade}・借入上限 ${yen(borrowLimit)}・金利 ${pct(effectiveRate)}`
     return f.hint
   }
@@ -108,7 +123,7 @@ export function DecisionPanel({
         {visible.map((f) => (
           <Field
             key={f.key}
-            label={f.label}
+            label={labelFor(f)}
             value={decision[f.key]}
             onChange={(v) => onChange({ [f.key]: v })}
             step={f.step}

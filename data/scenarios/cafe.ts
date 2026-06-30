@@ -1,56 +1,61 @@
 import type { Scenario } from './types'
 
 /**
- * カフェ: 低単価・薄利多売。原材料（食材）は安いが価格弾力性が高く、現金商売中心。
- * 数値は学習用のサンプル（出典なし）。
+ * カフェ（創業・薄利多売）: 設備＝「店舗・厨房」が「来客キャパ（人/月）」の上限を決める。
+ * 安い食材で数を売る。価格に敏感な客層、新メニュー（R&D）で集客を伸ばせる。
  */
 export const cafeScenario: Scenario = {
   id: 'cafe',
-  name: 'カフェ — 薄利多売',
+  name: 'カフェ — 小さな店の創業',
   description:
-    '小さなカフェ。安い食材で数を売る薄利多売。価格に敏感な客層、新メニュー（R&D）で集客を伸ばせる。',
+    '小さなカフェを創業。店舗・厨房に投資して来客キャパを広げ、安い食材の薄利多売で数を売る。新メニューで集客。',
   initialState: {
     turn: 0,
-    materialUnits: 1_000, // 食材 1,000個 × 200円 = 200,000
-    finishedUnits: 500, // 仕込み 500個 × 200円 = 100,000
+    materialUnits: 100, // 食材 100 × 200 = 20,000
+    finishedUnits: 50, // 仕込み 50 × 200 = 10,000
     materialIndex: 1.0,
     rdStock: 0,
     balanceSheet: {
-      currentAssets: { cash: 2_000_000, accountsReceivable: 0, rawMaterials: 200_000, finishedGoods: 100_000 },
-      fixedAssets: { equipment: 1_500_000 },
+      currentAssets: { cash: 500_000, accountsReceivable: 0, rawMaterials: 20_000, finishedGoods: 10_000 },
+      fixedAssets: { equipment: 400_000 },
       currentLiabilities: { accountsPayable: 0, shortTermDebt: 0 },
-      nonCurrentLiabilities: { longTermDebt: 800_000 },
-      equity: { capitalStock: 2_000_000, retainedEarnings: 1_000_000 },
+      nonCurrentLiabilities: { longTermDebt: 300_000 },
+      equity: { capitalStock: 500_000, retainedEarnings: 130_000 },
     },
   },
   params: {
     periodsPerYear: 12,
-    baseDemand: 2_000,
-    basePrice: 600,
+    baseDemand: 3_000,
+    basePrice: 500,
     priceElasticity: 1.5,
     competitorStrength: 0.4,
+    capacityPerEquipment: 0.0075, // 店舗40万 → 年間来客3,000 → 月次250
+    scaleEconomyMax: 0.1,
+    scaleEconomyHalf: 2_000_000,
+    equipmentLabel: '店舗・厨房',
+    capacityLabel: '来客キャパ',
     unitVariableCost: 200,
     materialVolatility: 0.2,
     materialMeanReversion: 0.3,
-    fixedCosts: 300_000,
+    fixedCosts: 360_000, // 家賃・人件費（年）
     depreciationRate: 0.1,
     salesOnCreditRatio: 0.05,
     payableRatio: 0.4,
     marketingEffect: 0.4,
-    marketingHalf: 100_000,
-    insuranceRefCost: 100_000,
+    marketingHalf: 30_000,
+    insuranceRefCost: 20_000,
     maxInsuranceCoverage: 0.8,
     rdCostReductionMax: 0.2,
     rdDemandBoostMax: 0.6,
-    rdHalf: 500_000,
-    interestRate: 0.03,
+    rdHalf: 200_000,
+    interestRate: 0.02,
     effectiveTaxRate: 0.3,
   },
   turnLimit: 96,
   goal: {
     kind: 'equityTarget',
-    label: '8年（96ヶ月）以内に純資産を 500万円に',
-    target: 5_000_000,
+    label: '8年（96ヶ月）以内に純資産を 150万円に',
+    target: 1_500_000,
     withinTurns: 96,
   },
 }
