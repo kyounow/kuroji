@@ -17,7 +17,8 @@ export function RatiosView({
     { label: '自己資本比率', value: pct(ratios.equityRatio), help: '資産に占める純資産。高いほど安全' },
     { label: 'ROE', value: pct(ratios.roe), help: '純資産に対する利益率' },
     { label: 'ROA', value: pct(ratios.roa), help: '総資産に対する利益率' },
-    { label: '売上総利益率', value: pct(ratios.grossMargin), help: '粗利の厚さ' },
+    { label: '売上原価率', value: pct(1 - ratios.grossMargin), help: '売上に占める原価。低いほど粗利が厚い' },
+    { label: '売上総利益率', value: pct(ratios.grossMargin), help: '粗利の厚さ（1−原価率）' },
     { label: '営業利益率', value: pct(ratios.operatingMargin), help: '本業の稼ぐ力' },
   ]
   return (

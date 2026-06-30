@@ -10,7 +10,7 @@ import {
   productionCapacity,
   costEfficiency,
 } from '@core/index'
-import { useGame } from './state'
+import { useGame, previewTurn } from './state'
 import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
 import { StatementsView } from './components/StatementsView'
@@ -18,6 +18,7 @@ import { RatiosView } from './components/RatiosView'
 import { HistoryTable } from './components/HistoryTable'
 import { HistoryChart } from './components/HistoryChart'
 import { MacroPanel } from './components/MacroPanel'
+import { ForecastPanel } from './components/ForecastPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { loadBest, saveBest } from './storage'
 import { yen, yenSigned, pct, num } from './format'
@@ -126,6 +127,9 @@ export function App() {
   const hasCompetitor = scenario.params.competitorStrength > 0
   const competitor = competitorAt(scenario.params, game.seed, game.current.turn)
   const ourShare = marketShare(decision.unitPrice, product.demandModifier, competitor, scenario.params)
+
+  // 今期の確定前プレビュー（この判断の見込み結果。原価率・損益分岐の算出に使う）。
+  const preview = useMemo(() => previewTurn(game, decision), [game, decision])
 
   return (
     <main className="app">
@@ -309,6 +313,8 @@ export function App() {
         capacityLabel={capacityLabel}
         equipmentLabel={equipmentLabel}
       />
+
+      {!gameOver && <ForecastPanel preview={preview} decision={decision} />}
 
       <HistoryTable
         history={game.history}

@@ -21,6 +21,8 @@ import {
   type MarketEvent,
   type GoalStatus,
   type Goal,
+  type TurnOptions,
+  type TurnResult,
 } from '@core/index'
 import { getScenario, AVAILABLE_SCENARIOS } from '@data/scenarios'
 import { getEventTable } from '@data/events'
@@ -115,6 +117,38 @@ function isBankrupt(state: CompanyState): boolean {
   return state.balanceSheet.currentAssets.cash < 0 || totalEquity(state.balanceSheet) < 0
 }
 
+/** この判断・現在状態でのターン解決オプション（イベント・市況・競合・マクロ）を組み立てる。 */
+function turnOptionsFor(game: GameState, decision: Decision): TurnOptions {
+  const scenario = getScenario(game.scenarioId)
+  const eventTable = getEventTable(scenario.eventTableId)
+  const event = drawEvent(eventTable, game.seed, game.current.turn)
+  const nextMaterialIndex = materialIndexNext(
+    game.current.materialIndex,
+    scenario.params,
+    game.seed,
+    game.current.turn,
+  )
+  const comp = competitorAt(scenario.params, game.seed, game.current.turn)
+  const ourQuality = productFromRd(game.current.rdStock, scenario.params).demandModifier
+  const demandShareMultiplier = shareMultiplier(decision.unitPrice, ourQuality, comp, scenario.params)
+  return {
+    demandMultiplier: event.demandMultiplier,
+    nextMaterialIndex,
+    oneOffLoss: event.oneOffLoss,
+    equipmentLoss: event.equipmentLoss,
+    demandShareMultiplier,
+    policyRate: game.macro.policyRate,
+    inflationIndex: game.macro.inflationIndex,
+    macroDemandMultiplier: cycleDemandMultiplier(game.macro),
+  }
+}
+
+/** 確定前のゴースト計算（コミットせず、この判断の見込み結果を返す）。確定と同じ式なので必ず一致。 */
+export function previewTurn(game: GameState, decision: Decision): TurnResult {
+  const scenario = getScenario(game.scenarioId)
+  return resolveTurn(game.current, decision, scenario.params, turnOptionsFor(game, decision))
+}
+
 function reducer(game: GameState, action: Action): GameState {
   switch (action.type) {
     case 'select':
@@ -128,31 +162,12 @@ function reducer(game: GameState, action: Action): GameState {
       const scenario = getScenario(game.scenarioId)
       const eventTable = getEventTable(scenario.eventTableId)
       const event = drawEvent(eventTable, game.seed, game.current.turn)
-      const nextMaterialIndex = materialIndexNext(
-        game.current.materialIndex,
+      const result = resolveTurn(
+        game.current,
+        action.decision,
         scenario.params,
-        game.seed,
-        game.current.turn,
+        turnOptionsFor(game, action.decision),
       )
-      // 競合との市場シェアから需要倍率を求める（自社品質は累積R&D由来）。
-      const comp = competitorAt(scenario.params, game.seed, game.current.turn)
-      const ourQuality = productFromRd(game.current.rdStock, scenario.params).demandModifier
-      const demandShareMultiplier = shareMultiplier(
-        action.decision.unitPrice,
-        ourQuality,
-        comp,
-        scenario.params,
-      )
-      const result = resolveTurn(game.current, action.decision, scenario.params, {
-        demandMultiplier: event.demandMultiplier,
-        nextMaterialIndex,
-        oneOffLoss: event.oneOffLoss,
-        equipmentLoss: event.equipmentLoss,
-        demandShareMultiplier,
-        policyRate: game.macro.policyRate,
-        inflationIndex: game.macro.inflationIndex,
-        macroDemandMultiplier: cycleDemandMultiplier(game.macro),
-      })
       const nextMacro = advanceMacro(game.macro, scenario.params, game.seed, game.current.turn)
       const record: TurnRecord = {
         turn: result.state.turn,
