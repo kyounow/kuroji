@@ -14,6 +14,8 @@ interface Props {
   currentMode: GameMode
   /** 進行中のデータがあるか（「始める」で最初からになる旨の注意を出す）。 */
   hasProgress: boolean
+  /** プレイ中はシナリオ（業種）を固定する（誤って別業種に切り替えて進行を失わないように）。 */
+  scenarioLocked: boolean
   onStart: (scenarioId: string, mode: GameMode) => void
   onClose: () => void
 }
@@ -25,11 +27,15 @@ export function SettingsModal({
   currentScenarioId,
   currentMode,
   hasProgress,
+  scenarioLocked,
   onStart,
   onClose,
 }: Props) {
   const [scenarioId, setScenarioId] = useState(currentScenarioId)
   const [mode, setMode] = useState<GameMode>(currentMode)
+  // プレイ中はシナリオを固定。明示的に「破棄して別業種で始める」を押した時だけ解除。
+  const [overrideScenario, setOverrideScenario] = useState(false)
+  const scenarioEditable = !scenarioLocked || overrideScenario
 
   // Escape で閉じる。
   useEffect(() => {
@@ -57,7 +63,10 @@ export function SettingsModal({
         </div>
 
         <fieldset className="choice-group">
-          <legend>シナリオ（業種）</legend>
+          <legend>
+            シナリオ（業種）
+            {scenarioLocked && !overrideScenario && <span className="muted small"> 🔒 プレイ中は固定</span>}
+          </legend>
           <div className="choice-cards">
             {scenarios.map((s) => (
               <button
@@ -65,13 +74,25 @@ export function SettingsModal({
                 type="button"
                 className={`choice-card ${scenarioId === s.id ? 'selected' : ''}`}
                 aria-pressed={scenarioId === s.id}
-                onClick={() => setScenarioId(s.id)}
+                disabled={!scenarioEditable && scenarioId !== s.id}
+                onClick={() => scenarioEditable && setScenarioId(s.id)}
               >
                 <span className="choice-name">{s.name}</span>
                 {s.description && <span className="choice-desc">{s.description}</span>}
               </button>
             ))}
           </div>
+          {scenarioLocked && !overrideScenario && (
+            <p className="muted small lock-note">
+              ゲーム開始後はシナリオ（業種）を変更できません。{' '}
+              <button type="button" className="link-btn" onClick={() => setOverrideScenario(true)}>
+                別の業種で新しく始める（今の経営を破棄）
+              </button>
+            </p>
+          )}
+          {overrideScenario && (
+            <p className="ng small lock-note">⚠ 業種を変えると今の経営は破棄され、最初からになります。</p>
+          )}
         </fieldset>
 
         <fieldset className="choice-group">

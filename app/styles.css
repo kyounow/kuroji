@@ -901,6 +901,15 @@ footer {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+.choice-card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lock-note {
+  margin: 0.5rem 0 0;
+}
+
 .choice-name {
   font-weight: 700;
 }

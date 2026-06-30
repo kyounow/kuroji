@@ -362,6 +362,7 @@ export function App() {
           currentScenarioId={game.scenarioId}
           currentMode={game.mode}
           hasProgress={game.history.length > 0}
+          scenarioLocked={game.history.length > 0 && !gameOver}
           onStart={(scenarioId, mode) => {
             newGame(scenarioId, mode)
             setSettingsOpen(false)
