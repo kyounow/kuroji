@@ -55,11 +55,22 @@ export function resolveTurn(
   // 当期の設備投資は当期から有効（期首設備＋当期 capex）。能力・コストに即反映する。
   const opEquipment = bs.fixedAssets.equipment + Math.max(0, decision.capitalExpenditure)
 
-  // 当期の従業員数（採用・退職を当期から反映＝即戦力）。人件費・労働能力を規定する。
+  // 当期の従業員数（採用・解雇を当期から反映＝即戦力）。人件費・労働能力を規定する。
   const hire = Math.max(0, decision.hire)
-  // 退職は在籍数（期首＋当期採用）まで。超過指示で存在しない人の退職金を払わないようクランプ。
+  // 解雇は在籍数（期首＋当期採用）まで。超過指示で存在しない人の退職金を払わないようクランプ。
   const fire = Math.min(Math.max(0, decision.fire), (state.headcount ?? 0) + hire)
-  const headcount = (state.headcount ?? 0) + hire - fire // fire を在籍上限でクランプ済み＝非負
+  const headcountAfterDecision = (state.headcount ?? 0) + hire - fire
+  // 給与水準（相場＝物価連動の市場賃金＝1.0）。低いほど人件費は下がるが離職率が上がる。
+  const wageMult = Math.max(0, decision.wageLevel) / 100
+  // 自主退職（離職）: 給与水準が相場(1.0)を下回るほど一定割合が離職（退職金なし）。
+  const shortfall = Math.max(0, 1 - wageMult)
+  const quitRate =
+    params.attritionSlope != null
+      ? Math.min(params.maxAttrition ?? 1, params.attritionSlope * shortfall)
+      : 0
+  // 浮動小数の丸め境界（例 0.5）を安定して切り上げるため微小εを加える。
+  const attritionQuits = Math.round(headcountAfterDecision * quitRate + 1e-9)
+  const headcount = Math.max(0, headcountAfterDecision - attritionQuits)
 
   // 当期の原材料スポット単価（物価 × 市況 × R&D 原価改善 × 設備の規模の経済）
   const spotCost = Math.max(
@@ -141,8 +152,10 @@ export function resolveTurn(
   const rdSpend = Math.max(0, decision.rdSpend)
   const insuranceSpend = Math.max(0, decision.insuranceSpend)
   const maintenanceSpend = Math.max(0, decision.maintenanceSpend)
-  // 人件費（給与＝従業員数×wage）＋採用費・退職金（一括）。未設定の wage は労働モデル無効＝0。
-  const laborCost = params.wage ? Math.round(headcount * params.wage * inflationIndex * periodFactor) : 0
+  // 人件費＝従業員数 × 市場賃金(wage×物価指数) × 給与水準。未設定の wage は労働モデル無効＝0。
+  const laborCost = params.wage
+    ? Math.round(headcount * params.wage * inflationIndex * wageMult * periodFactor)
+    : 0
   const hiringCost = hire * (params.hireCost ?? 0)
   const severanceCost = fire * (params.severance ?? 0)
   const operatingExpenses =
@@ -310,6 +323,7 @@ export function resolveTurn(
     effectiveInterestRate,
     appliedFinancing: financing,
     insuranceCoverage,
+    attritionQuits,
     shockOneOffLoss: oneOffLoss,
     shockEquipmentWritedown: equipmentWritedown,
     capacity,

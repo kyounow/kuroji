@@ -46,6 +46,7 @@ export function App() {
     capitalExpenditure: 0,
     hire: 0,
     fire: 0,
+    wageLevel: 100,
     financing: 0,
   })
   const patch = useCallback((p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p })), [])
@@ -63,6 +64,7 @@ export function App() {
       capitalExpenditure: 0,
       hire: 0,
       fire: 0,
+      wageLevel: 100,
       financing: 0,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -289,10 +291,15 @@ export function App() {
           </div>
           {hasLabor && (
             <div className="metric">
-              <div className="metric-value">{num(headcount)}人</div>
+              <div className={`metric-value ${preview.attritionQuits > 0 ? 'ng' : ''}`}>
+                {num(headcount)}人{preview.attritionQuits > 0 ? ` −${preview.attritionQuits}` : ''}
+              </div>
               <div className="metric-label">
                 従業員（労働能力 {Number.isFinite(labCapacity) ? `${num(labCapacity)}/月` : '—'}・設備{' '}
                 {Number.isFinite(equipCapacity) ? `${num(equipCapacity)}/月` : '無制限'}）
+                {preview.attritionQuits > 0 && (
+                  <span className="ng"> ／ 待遇悪化で {preview.attritionQuits}人 離職見込</span>
+                )}
               </div>
             </div>
           )}
@@ -363,6 +370,9 @@ export function App() {
         hireCost={scenario.params.hireCost}
         severance={scenario.params.severance}
         headcount={headcount}
+        inflationIndex={game.macro.inflationIndex}
+        attritionSlope={scenario.params.attritionSlope}
+        maxAttrition={scenario.params.maxAttrition}
       />
 
       {!gameOver && (

@@ -47,6 +47,8 @@ export const cafeScenario: Scenario = {
     laborPerHead: 375, // 1人あたり年375人（8人=3,000/年=月250＝来客キャパと同じ）
     hireCost: 15_000,
     severance: 12_000,
+    attritionSlope: 0.6, // 接客業は離職しやすい
+    maxAttrition: 0.35,
     salesOnCreditRatio: 0.05,
     payableRatio: 0.4,
     marketingEffect: 0.4,

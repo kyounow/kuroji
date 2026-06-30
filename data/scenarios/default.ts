@@ -50,6 +50,8 @@ export const defaultScenario: Scenario = {
     laborPerHead: 120, // 1人あたり年120個（5人=600/年=月50＝設備能力と同じ）
     hireCost: 12_000, // 採用費/人
     severance: 10_000, // 退職金/人
+    attritionSlope: 0.5, // 給与水準が相場を下回るほど離職（相場の半額で離職率0.5×0.5=25%）
+    maxAttrition: 0.3, // 1ヶ月の離職率上限30%
     // 発生主義（売掛・買掛）
     salesOnCreditRatio: 0.3,
     payableRatio: 0.3,

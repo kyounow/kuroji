@@ -15,6 +15,7 @@ const decide = (d: Partial<Decision> = {}): Decision => ({
   capitalExpenditure: 0,
   hire: 0,
   fire: 0,
+  wageLevel: 100,
   financing: 0,
   ...d,
 })
@@ -523,6 +524,32 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     // 退職金 3×8,000=24,000 − 人件費減3,000 → opEx +21,000（10人分ではない）
     expect(r.incomeStatement.operatingExpenses - baseR.incomeStatement.operatingExpenses).toBe(24_000 - 3_000)
     expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('給与水準（待遇）で人件費が変わり、相場割れで自主退職が起きる（インフレ連動）', () => {
+    const params: SimParams = { ...laborParams, attritionSlope: 0.5, maxAttrition: 0.3 }
+    const state: CompanyState = { ...BASE_STATE, headcount: 10 }
+    // 相場100%: 人件費 10×12,000/12=10,000、離職0
+    const market = resolveTurn(state, decide({ wageLevel: 100 }), params)
+    expect(market.attritionQuits).toBe(0)
+    expect(market.state.headcount).toBe(10)
+    // 待遇80%: 人件費 10×12,000×0.8/12=8,000（−2,000）、離職率 0.5×0.2=0.10 → 10人×0.10=1人離職
+    const low = resolveTurn(state, decide({ wageLevel: 80 }), params)
+    expect(low.attritionQuits).toBe(1)
+    expect(low.state.headcount).toBe(9)
+    // 人件費は離職後の人数で計算: 9×12,000×0.8/12 = 7,200
+    expect(low.incomeStatement.operatingExpenses).toBeLessThan(market.incomeStatement.operatingExpenses)
+    expect(balances(low.state.balanceSheet)).toBe(true)
+  })
+
+  it('物価上昇で市場賃金が上がる（同じ給与水準100%でも人件費が増える＝インフレ連動）', () => {
+    // 固定費0で人件費だけ物価連動を見る（fixedCosts も物価連動するため）。
+    const params: SimParams = { ...laborParams, fixedCosts: 0 }
+    const state: CompanyState = { ...BASE_STATE, headcount: 10 }
+    const normal = resolveTurn(state, decide({ wageLevel: 100 }), params) // 物価1.0
+    const inflated = resolveTurn(state, decide({ wageLevel: 100 }), params, { inflationIndex: 1.2 })
+    // 人件費 normal=10×12,000/12=10,000、inflated=10×12,000×1.2/12=12,000 → opEx差 2,000
+    expect(inflated.incomeStatement.operatingExpenses - normal.incomeStatement.operatingExpenses).toBe(2_000)
   })
 
   it('労働モデル未設定なら人件費・労働制約なし（後方互換）', () => {

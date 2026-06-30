@@ -38,6 +38,12 @@ interface Props {
   severance?: number
   /** 雇用: 現在の従業員数 */
   headcount?: number
+  /** 雇用: 当期の物価指数（市場賃金＝wage×物価指数） */
+  inflationIndex?: number
+  /** 雇用: 給与水準が相場を下回るときの離職率の傾き */
+  attritionSlope?: number
+  /** 雇用: 1期の離職率上限 */
+  maxAttrition?: number
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -92,7 +98,8 @@ const FIELDS: readonly FieldDef[] = [
   { key: 'maintenanceSpend', label: '保全・点検費', step: 10_000, hint: '' }, // hint は動的
   { key: 'capitalExpenditure', label: '設備投資', step: 100_000, hint: '固定資産↑・現金↓' },
   { key: 'hire', label: '採用（人数）', step: 1, hint: '' }, // hint は動的
-  { key: 'fire', label: '退職（人数）', step: 1, hint: '' }, // hint は動的
+  { key: 'fire', label: '解雇（人数）', step: 1, hint: '' }, // hint は動的
+  { key: 'wageLevel', label: '給与水準（％・相場=100）', step: 5, hint: '' }, // hint は動的
   {
     key: 'financing',
     label: '資金調達（借入＋／返済−）',
@@ -124,7 +131,15 @@ export function DecisionPanel({
   hireCost = 0,
   severance = 0,
   headcount = 0,
+  inflationIndex = 1,
+  attritionSlope,
+  maxAttrition = 1,
 }: Props) {
+  // 給与水準（相場=100）と離職率。市場賃金は物価指数で連動。
+  const marketWage = Math.round(wage * inflationIndex)
+  const offeredWage = Math.round(marketWage * (decision.wageLevel / 100))
+  const wageShortfall = Math.max(0, 1 - decision.wageLevel / 100)
+  const attritionRate = attritionSlope != null ? Math.min(maxAttrition, attritionSlope * wageShortfall) : 0
   const purchaseCost = materialUnitCost * Math.max(0, decision.purchaseMaterials)
   const insuranceCoverage =
     insuranceRefCost > 0 ? Math.min(maxInsuranceCoverage, decision.insuranceSpend / insuranceRefCost) : 0
@@ -152,6 +167,8 @@ export function DecisionPanel({
     if (f.key === 'hire')
       return `現在 ${headcount}人。採用費 ${yen(hireCost)}/人・給与 年${yen(wage)}/人 → 労働能力↑`
     if (f.key === 'fire') return `退職金 ${yen(severance)}/人 → 人件費・労働能力↓`
+    if (f.key === 'wageLevel')
+      return `相場 ${yen(marketWage)}/年・支給 ${yen(offeredWage)}/年。${decision.wageLevel < 100 ? `市場割れ→離職率 ${pct(attritionRate)}/月` : '相場以上＝離職なし'}`
     if (f.key === 'financing') return `格付${creditGrade}・借入上限 ${yen(borrowLimit)}・金利 ${pct(effectiveRate)}`
     return f.hint
   }

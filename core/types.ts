@@ -93,8 +93,10 @@ export interface Decision {
   capitalExpenditure: number
   /** 当期の採用人数（採用コストが一括費用。当期から労働力に算入） */
   hire: number
-  /** 当期の退職人数（退職金が一括費用。当期から労働力から除外） */
+  /** 当期の解雇人数（退職金が一括費用。当期から労働力から除外） */
   fire: number
+  /** 給与水準（％。相場＝物価連動の市場賃金＝100）。低いと人件費は下がるが離職率が上がる。 */
+  wageLevel: number
   /** 新規借入額（マイナスは返済） */
   financing: number
 }
@@ -206,6 +208,8 @@ export interface TurnResult {
   appliedFinancing: number
   /** 当期の保険補償率（0..1） */
   insuranceCoverage: number
+  /** 当期に自主退職（待遇悪化による離職）した人数 */
+  attritionQuits: number
   /** 当期に算出された一時損失（保険前 gross。floor/cap/severity 適用後。バナーの見込み額に使う） */
   shockOneOffLoss: number
   /** 当期に算出された設備毀損（保険前 gross。簿価クリップ後。バナーの見込み額に使う） */
@@ -254,8 +258,12 @@ export interface SimParams {
   laborPerHead?: number
   /** 1人採用あたりの一括コスト（採用費）。未設定で 0。 */
   hireCost?: number
-  /** 1人退職あたりの一括コスト（退職金）。未設定で 0。 */
+  /** 1人解雇あたりの一括コスト（退職金）。未設定で 0。 */
   severance?: number
+  /** 自主退職: 給与水準が相場を1.0下回るごとの離職率の傾き（例 0.5＝相場の半額で離職率0.5×0.5＝25%）。未設定で離職なし。 */
+  attritionSlope?: number
+  /** 自主退職: 1期あたりの離職率の上限（0..1。例 0.3）。 */
+  maxAttrition?: number
 
   // --- コスト・原材料 ---
   /** 原材料の基準単価（1製品あたり原材料1単位を消費。スポット価格の基準） */

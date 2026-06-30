@@ -39,4 +39,5 @@ export type DecisionField =
   | 'capitalExpenditure'
   | 'hire'
   | 'fire'
+  | 'wageLevel'
   | 'financing'

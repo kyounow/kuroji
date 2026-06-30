@@ -47,6 +47,8 @@ export const startupScenario: Scenario = {
     laborPerHead: 60, // 1人あたり年60件（4人=240/年=月20＝処理能力と同じ）
     hireCost: 30_000, // 採用が高い
     severance: 25_000,
+    attritionSlope: 0.7, // エンジニアは待遇に敏感で流動性が高い
+    maxAttrition: 0.4,
     salesOnCreditRatio: 0.6,
     payableRatio: 0.3,
     marketingEffect: 0.6,
