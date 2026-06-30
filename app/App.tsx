@@ -17,6 +17,7 @@ import { StatementsView } from './components/StatementsView'
 import { RatiosView } from './components/RatiosView'
 import { HistoryTable } from './components/HistoryTable'
 import { HistoryChart } from './components/HistoryChart'
+import { MacroPanel } from './components/MacroPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { loadBest, saveBest } from './storage'
 import { yen, yenSigned, pct, num } from './format'
@@ -96,9 +97,9 @@ export function App() {
       costEfficiency(game.current.balanceSheet.fixedAssets.equipment, scenario.params),
   )
 
-  // 信用力（格付け・実効金利・借入枠）。期首の財務状態で評価。
+  // 信用力（格付け・実効金利・借入枠）。実効金利＝政策金利＋スプレッド＋信用スプレッド。
   const credit = assessCredit(game.current)
-  const effectiveRate = scenario.params.interestRate + credit.spread
+  const effectiveRate = game.macro.policyRate + scenario.params.interestRate + credit.spread
 
   // ターンの呼称（四半期 / 月次 / 年次）。
   const ppy = scenario.params.periodsPerYear ?? 1
@@ -225,6 +226,8 @@ export function App() {
       {gameOver && score && <ScoreCard score={score} best={best} won={game.outcome === 'won'} />}
 
       <EventBanner event={upcomingEvent} />
+
+      <MacroPanel macro={game.macro} effectiveRate={effectiveRate} />
 
       <section className="product">
         <h2>製品・原材料の状態</h2>

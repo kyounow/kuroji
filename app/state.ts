@@ -8,7 +8,11 @@ import {
   shareMultiplier,
   productFromRd,
   evaluateGoal,
+  initialMacro,
+  advanceMacro,
+  cycleDemandMultiplier,
   totalEquity,
+  type MacroState,
   type CompanyState,
   type Decision,
   type IncomeStatement,
@@ -56,6 +60,8 @@ export interface GameState {
   mode: GameMode
   seed: number
   current: CompanyState
+  /** マクロ経済の状態（景気・物価・政策金利） */
+  macro: MacroState
   history: TurnRecord[]
   outcome: Outcome
   /** ゴール（勝利条件）の状況。フリープレイなら null。 */
@@ -90,6 +96,7 @@ function makeInitial(scenarioId: string, seed: number, mode: GameMode): GameStat
     mode,
     seed,
     current: scenario.initialState,
+    macro: initialMacro(scenario.params),
     history: [],
     outcome: 'playing',
     goalStatus: evalGoal(scenarioId, scenario.initialState, mode),
@@ -142,7 +149,11 @@ function reducer(game: GameState, action: Action): GameState {
         oneOffLoss: event.oneOffLoss,
         equipmentLoss: event.equipmentLoss,
         demandShareMultiplier,
+        policyRate: game.macro.policyRate,
+        inflationIndex: game.macro.inflationIndex,
+        macroDemandMultiplier: cycleDemandMultiplier(game.macro),
       })
+      const nextMacro = advanceMacro(game.macro, scenario.params, game.seed, game.current.turn)
       const record: TurnRecord = {
         turn: result.state.turn,
         event,
@@ -176,6 +187,7 @@ function reducer(game: GameState, action: Action): GameState {
       return {
         ...game,
         current: result.state,
+        macro: nextMacro,
         history: [...game.history, record].slice(-MAX_TURNS),
         outcome,
         goalStatus,
@@ -188,7 +200,7 @@ function reducer(game: GameState, action: Action): GameState {
 /** 起動時: 保存済みゲームがあれば復元、なければ新規。 */
 function initGame(): GameState {
   const saved = loadGame() as GameState | null
-  if (saved && saved.scenarioId && saved.current && Array.isArray(saved.history)) {
+  if (saved && saved.scenarioId && saved.current && saved.macro && Array.isArray(saved.history)) {
     return saved
   }
   return makeInitial(DEFAULT_SCENARIO, DEFAULT_SEED, 'challenge')

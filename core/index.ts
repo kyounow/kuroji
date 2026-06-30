@@ -23,6 +23,13 @@ export { productionCapacity, costEfficiency } from './finance/capacity'
 export { productFromRd } from './product/research'
 export { materialIndexNext } from './market/material'
 export { competitorAt, shareMultiplier, marketShare, type Competitor } from './market/competitor'
+export {
+  initialMacro,
+  advanceMacro,
+  cycleDemandMultiplier,
+  type MacroState,
+  type MacroPhase,
+} from './macro/macro'
 export { evaluateGoal } from './goals/evaluateGoal'
 export { scoreGame, type ScoreBreakdown, type ScoreInput } from './score/score'
 export { resolveTurn, marketingMultiplier } from './engine/resolveTurn'

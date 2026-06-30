@@ -45,12 +45,16 @@ export function resolveTurn(
   // 1ターンの長さ（年→期間）。流量はこの係数でスケールする。
   const ppy = params.periodsPerYear ?? 1
   const periodFactor = 1 / ppy
+  // マクロ（物価指数・景気需要倍率）。未注入なら無効（1.0）。
+  const inflationIndex = options.inflationIndex ?? 1
+  const macroDemandMultiplier = options.macroDemandMultiplier ?? 1
 
-  // 当期の原材料スポット単価（市況 × R&D 原価改善 × 設備の規模の経済）
+  // 当期の原材料スポット単価（物価 × 市況 × R&D 原価改善 × 設備の規模の経済）
   const spotCost = Math.max(
     0,
     Math.round(
       params.unitVariableCost *
+        inflationIndex *
         state.materialIndex *
         product.unitCostModifier *
         costEfficiency(bs.fixedAssets.equipment, params),
@@ -89,13 +93,15 @@ export function resolveTurn(
   // --- ③ 需要と販売（製品在庫から） ---
   const demandMultiplier = options.demandMultiplier ?? 1
   const shareMultiplier = options.demandShareMultiplier ?? 1
-  const rawDemand = demandAt(decision.unitPrice, params)
+  // 物価上昇時に名目価格を据え置くと実質値下げ→需要増（unitPrice を物価で割る）。
+  const rawDemand = demandAt(decision.unitPrice / inflationIndex, params)
   const demand = Math.max(
     0,
     Math.round(
       rawDemand *
         marketingMultiplier(decision.marketingSpend, params) *
         demandMultiplier *
+        macroDemandMultiplier *
         product.demandModifier *
         shareMultiplier *
         periodFactor,
@@ -109,8 +115,8 @@ export function resolveTurn(
 
   // --- 損益計算書（P/L） ---
   const grossProfit = revenue - costOfGoodsSold
-  // 固定費・減価償却は年額を期間でスケール。
-  const fixedCosts = Math.round(params.fixedCosts * periodFactor)
+  // 固定費（物価で増減）・減価償却は年額を期間でスケール。
+  const fixedCosts = Math.round(params.fixedCosts * inflationIndex * periodFactor)
   const depreciation = Math.round(bs.fixedAssets.equipment * params.depreciationRate * periodFactor)
   const marketingSpend = Math.max(0, decision.marketingSpend)
   const rdSpend = Math.max(0, decision.rdSpend)
@@ -118,9 +124,9 @@ export function resolveTurn(
   const operatingExpenses = fixedCosts + depreciation + marketingSpend + rdSpend + insuranceSpend
   const operatingIncome = grossProfit - operatingExpenses
 
-  // 信用力に応じて金利スプレッドが乗る（期首の財務状態で評価）。
+  // 実効金利＝政策金利（マクロ）＋銀行スプレッド＋信用スプレッド（期首の財務状態で評価）。
   const credit = assessCredit(state)
-  const effectiveInterestRate = params.interestRate + credit.spread
+  const effectiveInterestRate = (options.policyRate ?? 0) + params.interestRate + credit.spread
   const debt = bs.currentLiabilities.shortTermDebt + bs.nonCurrentLiabilities.longTermDebt
   const interestExpense = Math.round(debt * effectiveInterestRate * periodFactor)
 

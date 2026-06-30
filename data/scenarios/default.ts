@@ -18,11 +18,11 @@ export const defaultScenario: Scenario = {
     materialIndex: 1.0,
     rdStock: 0,
     balanceSheet: {
-      currentAssets: { cash: 600_000, accountsReceivable: 0, rawMaterials: 60_000, finishedGoods: 30_000 },
+      currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 60_000, finishedGoods: 30_000 },
       fixedAssets: { equipment: 300_000 },
       currentLiabilities: { accountsPayable: 0, shortTermDebt: 0 },
-      nonCurrentLiabilities: { longTermDebt: 200_000 },
-      equity: { capitalStock: 600_000, retainedEarnings: 190_000 },
+      nonCurrentLiabilities: { longTermDebt: 400_000 },
+      equity: { capitalStock: 800_000, retainedEarnings: 190_000 },
     },
   },
   params: {
@@ -40,10 +40,10 @@ export const defaultScenario: Scenario = {
     unitVariableCost: 600,
     materialVolatility: 0.15,
     materialMeanReversion: 0.3,
-    fixedCosts: 180_000,
+    fixedCosts: 120_000,
     depreciationRate: 0.1,
     // 発生主義（売掛・買掛）
-    salesOnCreditRatio: 0.4,
+    salesOnCreditRatio: 0.3,
     payableRatio: 0.3,
     // 販促
     marketingEffect: 0.5,
@@ -56,8 +56,12 @@ export const defaultScenario: Scenario = {
     rdDemandBoostMax: 0.5,
     rdHalf: 300_000,
     // 財務・税
-    interestRate: 0.02,
+    interestRate: 0.02, // 政策金利への銀行スプレッド
     effectiveTaxRate: 0.3,
+    // マクロ経済
+    inflationTarget: 0.02,
+    policyNeutralRate: 0.01,
+    macroVolatility: 0.5,
   },
   turnLimit: 96, // 8年（96ヶ月）
   goal: {

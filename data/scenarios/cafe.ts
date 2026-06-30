@@ -50,6 +50,9 @@ export const cafeScenario: Scenario = {
     rdHalf: 200_000,
     interestRate: 0.02,
     effectiveTaxRate: 0.3,
+    inflationTarget: 0.02,
+    policyNeutralRate: 0.01,
+    macroVolatility: 0.5,
   },
   turnLimit: 96,
   goal: {

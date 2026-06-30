@@ -321,6 +321,30 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(big).toBeLessThan(small)
   })
 
+  it('インフレ（物価指数>1）でスポット単価が上がる／デフレ(<1)で下がる', () => {
+    const { initialState, params } = base()
+    const at = (idx: number) =>
+      resolveTurn(initialState, decide(), params, { inflationIndex: idx }).effectiveUnitCost
+    expect(at(1.2)).toBeGreaterThan(at(1.0))
+    expect(at(0.8)).toBeLessThan(at(1.0))
+  })
+
+  it('政策金利が実効金利に上乗せされる', () => {
+    const { initialState, params } = base()
+    const r0 = resolveTurn(initialState, decide(), params).effectiveInterestRate
+    const r1 = resolveTurn(initialState, decide(), params, { policyRate: 0.03 }).effectiveInterestRate
+    expect(r1).toBeCloseTo(r0 + 0.03)
+    expect(balances(resolveTurn(initialState, decide(), params, { policyRate: 0.03 }).state.balanceSheet)).toBe(true)
+  })
+
+  it('景気の需要倍率が需要に作用する', () => {
+    const { initialState, params } = base()
+    const setup = decide({ purchaseMaterials: 1_000, produceUnits: 1_000 })
+    const boom = resolveTurn(initialState, setup, params, { macroDemandMultiplier: 1.15 }).unitsSold
+    const bust = resolveTurn(initialState, setup, params, { macroDemandMultiplier: 0.85 }).unitsSold
+    expect(boom).toBeGreaterThan(bust)
+  })
+
   it('明示パラメータで損益が手計算と一致する', () => {
     // 期首: 現金 1,000,000 / 原材料 0 / 製品 1,000個=1,000,000 / 設備 1,000,000
     //       長期借入 500,000 / 資本金 1,000,000 / 利益剰余金 1,500,000

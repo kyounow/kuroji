@@ -116,6 +116,12 @@ export interface TurnOptions {
   equipmentLoss?: number
   /** 競合との市場シェアに由来する需要倍率（既定 1.0） */
   demandShareMultiplier?: number
+  /** 当期の政策金利（マクロ由来。実効金利＝政策金利＋スプレッド＋信用スプレッド。既定 0） */
+  policyRate?: number
+  /** 当期の物価指数（マクロ由来。価格・原価・固定費に作用。既定 1.0） */
+  inflationIndex?: number
+  /** 当期の景気局面に由来する需要倍率（既定 1.0） */
+  macroDemandMultiplier?: number
 }
 
 /**
@@ -237,10 +243,18 @@ export interface SimParams {
   rdHalf: number
 
   // --- 財務・税 ---
-  /** 有利子負債（期首）に対する利率 */
+  /** 有利子負債（期首）に対する銀行スプレッド（政策金利に上乗せ） */
   interestRate: number
   /** 法人税の実効税率（暫定フラット。のち出典付きテーブル化） */
   effectiveTaxRate: number
+
+  // --- マクロ経済（景気・インフレ・政策金利） ---
+  /** 年率インフレ目標（既定 0.02）。0 で物価安定。 */
+  inflationTarget?: number
+  /** 中立政策金利（年率、既定 0.01） */
+  policyNeutralRate?: number
+  /** 景気・インフレの変動の大きさ（0 = マクロ静的） */
+  macroVolatility?: number
 }
 
 /**

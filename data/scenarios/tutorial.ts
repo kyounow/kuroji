@@ -46,6 +46,9 @@ export const tutorialScenario: Scenario = {
     rdHalf: 300_000,
     interestRate: 0.02,
     effectiveTaxRate: 0.3,
+    // マクロは静的（物価・景気を動かさず、基本の流れに集中）
+    inflationTarget: 0,
+    macroVolatility: 0,
   },
   enabledDecisions: ['unitPrice', 'purchaseMaterials', 'produceUnits'],
   turnLimit: 24,
