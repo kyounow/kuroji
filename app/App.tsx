@@ -327,6 +327,7 @@ export function App() {
         state={selected ? selected.stateAfter : game.current}
         last={selected}
         periodsPerYear={ppy}
+        history={game.history}
       />
 
       <HistoryChart initial={scenario.initialState} history={game.history} />

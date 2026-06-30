@@ -9,15 +9,18 @@ import type { TurnRecord } from '../state'
 import { yen, num, periodLabel } from '../format'
 import { BalanceSheetChart } from './BalanceSheetChart'
 import { WaterfallChart, type WaterfallStep } from './WaterfallChart'
+import { StatementsTrend } from './StatementsTrend'
 
 interface Props {
   state: CompanyState
   last: TurnRecord | null
   periodsPerYear: number
+  /** 推移グラフ用の全履歴 */
+  history: TurnRecord[]
 }
 
 type Mode = 'chart' | 'table'
-type Layout = 'focus' | 'grid'
+type Layout = 'focus' | 'grid' | 'trend'
 type Tab = 'bs' | 'pl' | 'cf'
 
 function Row({ label, value, kind }: { label: string; value: number; kind?: 'sub' | 'total' }) {
@@ -30,7 +33,7 @@ function Row({ label, value, kind }: { label: string; value: number; kind?: 'sub
 }
 
 /** 財務三表。1つずつ大きく（タブ切替）／3つ並べて、グラフ／表 を切り替えられる。 */
-export function StatementsView({ state, last, periodsPerYear }: Props) {
+export function StatementsView({ state, last, periodsPerYear, history }: Props) {
   const plabel = (turn: number) => periodLabel(turn, periodsPerYear)
   const [mode, setMode] = useState<Mode>('chart')
   const [layout, setLayout] = useState<Layout>('focus')
@@ -168,19 +171,26 @@ export function StatementsView({ state, last, periodsPerYear }: Props) {
               <button className={layout === 'grid' ? 'on' : ''} onClick={() => setLayout('grid')}>
                 3つ並べて
               </button>
-            </div>
-            <div className="seg">
-              <button className={mode === 'chart' ? 'on' : ''} onClick={() => setMode('chart')}>
-                グラフ
-              </button>
-              <button className={mode === 'table' ? 'on' : ''} onClick={() => setMode('table')}>
-                表
+              <button className={layout === 'trend' ? 'on' : ''} onClick={() => setLayout('trend')}>
+                推移
               </button>
             </div>
+            {layout !== 'trend' && (
+              <div className="seg">
+                <button className={mode === 'chart' ? 'on' : ''} onClick={() => setMode('chart')}>
+                  グラフ
+                </button>
+                <button className={mode === 'table' ? 'on' : ''} onClick={() => setMode('table')}>
+                  表
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {layout === 'focus' ? (
+        {layout === 'trend' ? (
+          <StatementsTrend history={history} periodsPerYear={periodsPerYear} />
+        ) : layout === 'focus' ? (
           <>
             <div className="tabs">
               {tabs.map((t) => (
