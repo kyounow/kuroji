@@ -44,6 +44,18 @@ export function ForecastPanel({
           <div className="metric-label">見込み当期純利益</div>
         </div>
         <div className="metric">
+          <div className={`metric-value ${preview.cashFlow.cashEnd >= 0 ? '' : 'ng'}`}>
+            {yen(preview.cashFlow.cashEnd)}
+          </div>
+          <div className="metric-label">見込み期末現金（投資・返済を反映）</div>
+        </div>
+        <div className="metric">
+          <div className="metric-value">
+            {Number.isFinite(preview.capacity) ? `${num(preview.capacity)}/月` : '無制限'}
+          </div>
+          <div className="metric-label">見込み生産能力（設備投資で増える）</div>
+        </div>
+        <div className="metric">
           <div className="metric-value">{pct(be.costRatio)}</div>
           <div className="metric-label">原価率（粗利率 {pct(be.grossMarginRatio)}）</div>
         </div>

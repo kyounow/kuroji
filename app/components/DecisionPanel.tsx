@@ -46,10 +46,13 @@ function Field({
       <span className="field-label">{label}</span>
       <input
         type="number"
-        value={value}
+        // 0 のときは空表示（placeholder 0）にして、先頭に 0 が残らないようにする。
+        value={value === 0 ? '' : value}
+        placeholder="0"
         min={min}
         step={step}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
       />
       {hint && <span className="field-hint">{hint}</span>}
     </label>

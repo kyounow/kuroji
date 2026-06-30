@@ -49,6 +49,9 @@ export function resolveTurn(
   const inflationIndex = options.inflationIndex ?? 1
   const macroDemandMultiplier = options.macroDemandMultiplier ?? 1
 
+  // 当期の設備投資は当期から有効（期首設備＋当期 capex）。能力・コストに即反映する。
+  const opEquipment = bs.fixedAssets.equipment + Math.max(0, decision.capitalExpenditure)
+
   // 当期の原材料スポット単価（物価 × 市況 × R&D 原価改善 × 設備の規模の経済）
   const spotCost = Math.max(
     0,
@@ -57,12 +60,12 @@ export function resolveTurn(
         inflationIndex *
         state.materialIndex *
         product.unitCostModifier *
-        costEfficiency(bs.fixedAssets.equipment, params),
+        costEfficiency(opEquipment, params),
     ),
   )
 
-  // 当期の生産能力（設備に比例）。
-  const capacity = productionCapacity(bs.fixedAssets.equipment, params, periodFactor)
+  // 当期の生産能力（設備に比例。当期 capex を含む）。
+  const capacity = productionCapacity(opEquipment, params, periodFactor)
 
   // 期首残高
   const cashBegin = bs.currentAssets.cash
