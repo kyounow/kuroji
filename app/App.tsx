@@ -314,11 +314,20 @@ export function App() {
         history={game.history}
         selectedTurn={selectedTurn}
         onSelect={setSelectedTurn}
+        periodsPerYear={ppy}
       />
 
-      <RatiosView ratios={selected ? selected.ratios : null} turn={selected?.turn} />
+      <RatiosView
+        ratios={selected ? selected.ratios : null}
+        turn={selected?.turn}
+        periodsPerYear={ppy}
+      />
 
-      <StatementsView state={selected ? selected.stateAfter : game.current} last={selected} />
+      <StatementsView
+        state={selected ? selected.stateAfter : game.current}
+        last={selected}
+        periodsPerYear={ppy}
+      />
 
       <HistoryChart initial={scenario.initialState} history={game.history} />
 

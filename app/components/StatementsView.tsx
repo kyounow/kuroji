@@ -6,13 +6,14 @@ import {
   type CompanyState,
 } from '@core/index'
 import type { TurnRecord } from '../state'
-import { yen, num } from '../format'
+import { yen, num, periodLabel } from '../format'
 import { BalanceSheetChart } from './BalanceSheetChart'
 import { WaterfallChart, type WaterfallStep } from './WaterfallChart'
 
 interface Props {
   state: CompanyState
   last: TurnRecord | null
+  periodsPerYear: number
 }
 
 type Mode = 'chart' | 'table'
@@ -29,7 +30,8 @@ function Row({ label, value, kind }: { label: string; value: number; kind?: 'sub
 }
 
 /** 財務三表。1つずつ大きく（タブ切替）／3つ並べて、グラフ／表 を切り替えられる。 */
-export function StatementsView({ state, last }: Props) {
+export function StatementsView({ state, last, periodsPerYear }: Props) {
+  const plabel = (turn: number) => periodLabel(turn, periodsPerYear)
   const [mode, setMode] = useState<Mode>('chart')
   const [layout, setLayout] = useState<Layout>('focus')
   const [tab, setTab] = useState<Tab>('bs')
@@ -142,9 +144,9 @@ export function StatementsView({ state, last }: Props) {
   )
 
   const cards: Record<Tab, { title: string; body: ReactNode }> = {
-    bs: { title: `貸借対照表（B/S）${state.turn > 0 ? `第${state.turn}期末` : '期首'}`, body: bsBody },
-    pl: { title: `損益計算書（P/L）${last ? `第${last.turn}期` : ''}`, body: plBody },
-    cf: { title: `キャッシュ・フロー（C/F）${last ? `第${last.turn}期` : ''}`, body: cfBody },
+    bs: { title: `貸借対照表（B/S）${state.turn > 0 ? `${plabel(state.turn)}末` : '期首'}`, body: bsBody },
+    pl: { title: `損益計算書（P/L）${last ? plabel(last.turn) : ''}`, body: plBody },
+    cf: { title: `キャッシュ・フロー（C/F）${last ? plabel(last.turn) : ''}`, body: cfBody },
   }
 
   const tabs: { key: Tab; label: string }[] = [

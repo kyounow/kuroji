@@ -544,6 +544,26 @@ table.history tbody tr.selected {
   outline-offset: -2px;
 }
 
+/* 年度サマリー行 */
+table.history tbody tr.year-head {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-weight: 700;
+}
+
+table.history tbody tr.year-head td {
+  border-top: 2px solid var(--border);
+}
+
+table.history tbody tr.year-head:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* 月別行（年度内のインデント） */
+table.history tbody tr.month-row td.month-cell {
+  padding-left: 1.5rem;
+  color: var(--muted);
+}
+
 /* 製品パネル */
 .product {
   border: 1px solid var(--border);

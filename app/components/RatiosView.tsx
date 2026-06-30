@@ -1,8 +1,16 @@
 import type { Ratios } from '@core/index'
-import { pct, ratio } from '../format'
+import { pct, ratio, periodLabel } from '../format'
 
 /** 主要な経営指標の一覧。 */
-export function RatiosView({ ratios, turn }: { ratios: Ratios | null; turn?: number }) {
+export function RatiosView({
+  ratios,
+  turn,
+  periodsPerYear,
+}: {
+  ratios: Ratios | null
+  turn?: number
+  periodsPerYear: number
+}) {
   if (!ratios) return null
   const items: { label: string; value: string; help: string }[] = [
     { label: '流動比率', value: ratio(ratios.currentRatio), help: '短期の支払能力。200%以上が目安' },
@@ -14,7 +22,7 @@ export function RatiosView({ ratios, turn }: { ratios: Ratios | null; turn?: num
   ]
   return (
     <section className="panel">
-      <h2>経営指標{turn ? `（第${turn}期）` : ''}</h2>
+      <h2>経営指標{turn ? `（${periodLabel(turn, periodsPerYear)}）` : ''}</h2>
       <div className="metrics">
         {items.map((it) => (
           <div className="metric" key={it.label} title={it.help}>
