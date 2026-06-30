@@ -352,7 +352,7 @@ export function App() {
         creditGrade={credit.grade}
         borrowLimit={credit.borrowLimit}
         effectiveRate={effectiveRate}
-        capacity={capacity}
+        capacity={preview.capacity}
         capacityLabel={capacityLabel}
         equipmentLabel={equipmentLabel}
         insuranceRefCost={scenario.params.insuranceRefCost}

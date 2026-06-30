@@ -57,8 +57,9 @@ export function resolveTurn(
 
   // 当期の従業員数（採用・退職を当期から反映＝即戦力）。人件費・労働能力を規定する。
   const hire = Math.max(0, decision.hire)
-  const fire = Math.max(0, decision.fire)
-  const headcount = Math.max(0, (state.headcount ?? 0) + hire - fire)
+  // 退職は在籍数（期首＋当期採用）まで。超過指示で存在しない人の退職金を払わないようクランプ。
+  const fire = Math.min(Math.max(0, decision.fire), (state.headcount ?? 0) + hire)
+  const headcount = (state.headcount ?? 0) + hire - fire // fire を在籍上限でクランプ済み＝非負
 
   // 当期の原材料スポット単価（物価 × 市況 × R&D 原価改善 × 設備の規模の経済）
   const spotCost = Math.max(

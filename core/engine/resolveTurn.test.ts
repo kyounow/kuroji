@@ -515,6 +515,16 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(balances(fired.state.balanceSheet)).toBe(true)
   })
 
+  it('在籍数を超える退職は実退職数までで退職金も頭打ち（幽霊費用を出さない）', () => {
+    const state: CompanyState = { ...BASE_STATE, headcount: 3 }
+    const baseR = resolveTurn(state, decide({}), laborParams) // 人件費 3×12,000/12 = 3,000
+    const r = resolveTurn(state, decide({ fire: 10 }), laborParams) // 在籍3 → 実退職3
+    expect(r.state.headcount).toBe(0)
+    // 退職金 3×8,000=24,000 − 人件費減3,000 → opEx +21,000（10人分ではない）
+    expect(r.incomeStatement.operatingExpenses - baseR.incomeStatement.operatingExpenses).toBe(24_000 - 3_000)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
   it('労働モデル未設定なら人件費・労働制約なし（後方互換）', () => {
     const r = resolveTurn(
       { ...BASE_STATE, headcount: 5 },
