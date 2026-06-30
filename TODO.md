@@ -94,10 +94,12 @@
 詳細設計は計画ファイル（`.claude/plans/bright-forging-rain.md`）参照。
 
 - [x] **PART A**: 突発ショックを確率リスク化。設備故障は整備状態(condition)、リコールは製品品質で発生率↓。
-- [x] **Phase 1 人的リソース（雇用）**: headcount／採用・退職／人件費(opEx)／労働を第二の生産能力制約（min(設備, 労働)）。
-- [ ] **Phase 2 株式基盤＋増資**: sharesOutstanding・発行価格(BVPS)・EPS/希薄化、増資=cash↑+capitalStock↑（財務CF）。
-- [ ] **Phase 3 M&A**: のれん(goodwill)・取得会計・償却、競合/ターゲット吸収。
-- [ ] **Phase 4 IPO・配当**: 大型増資(PER時価総額)・上場維持コスト・知名度ブースト・配当・ゲート(canIPO)。
+- [x] **Phase 1 人的リソース（雇用）**: headcount／採用・解雇／人件費(opEx)／労働を第二の生産能力制約（min(設備, 労働)）。
+- [x] **Phase 1+ 雇用の改善**: 退職→解雇に改称、給与水準(wageLevel)＝市場賃金(物価連動)比、待遇が相場割れで自主退職(離職)。
+- [x] **Phase 2 株式基盤＋増資**: sharesOutstanding・発行価格(BVPS)・EPS/希薄化、増資=cash↑+capitalStock↑（財務CF）。
+- [ ] **Phase 3 M&A（⏸ 後回し）**: のれん(goodwill)・取得会計・償却、競合/ターゲット吸収。恒等式リスク最大のため
+      テスト先行（買収直後 balances()／CF三区分和=Δcash）。専用モーダル＋確認で実装予定。**ユーザー判断で保留中**。
+- [ ] **Phase 4 IPO・配当**: 大型増資(PER時価総額)・上場維持コスト・知名度ブースト・配当・ゲート(canIPO)。Phase2の増資経路を再利用（M&A非依存）。
 
 ### 人的リソースの拡張（今後・メモ）
 
