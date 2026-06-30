@@ -61,6 +61,8 @@ export interface CompanyState {
   rdStock: number
   /** 設備の整備状態（0..1、1=新品同様）。保全費の累積で上がり、放置で逓減。高いほど故障の発生率が下がる。未設定は 1。 */
   condition?: number
+  /** 従業員数。人件費（給与）と労働による生産能力を規定する。未設定は 0。 */
+  headcount?: number
 }
 
 /** 研究開発の成果として変化する製品パラメータ。 */
@@ -89,6 +91,10 @@ export interface Decision {
   maintenanceSpend: number
   /** 設備投資額 */
   capitalExpenditure: number
+  /** 当期の採用人数（採用コストが一括費用。当期から労働力に算入） */
+  hire: number
+  /** 当期の退職人数（退職金が一括費用。当期から労働力から除外） */
+  fire: number
   /** 新規借入額（マイナスは返済） */
   financing: number
 }
@@ -240,6 +246,16 @@ export interface SimParams {
   equipmentLabel?: string
   /** 表示用ラベル（業種別。既定「生産能力」） */
   capacityLabel?: string
+
+  // --- 人的リソース（雇用・人件費・労働による生産能力） ---
+  /** 1人あたりの年間給与（人件費＝従業員数×wage）。未設定で人件費・労働制約なし（後方互換）。 */
+  wage?: number
+  /** 1人あたりの年間労働生産能力（数量）。これと設備能力の小さい方が当期の生産上限。未設定で労働制約なし。 */
+  laborPerHead?: number
+  /** 1人採用あたりの一括コスト（採用費）。未設定で 0。 */
+  hireCost?: number
+  /** 1人退職あたりの一括コスト（退職金）。未設定で 0。 */
+  severance?: number
 
   // --- コスト・原材料 ---
   /** 原材料の基準単価（1製品あたり原材料1単位を消費。スポット価格の基準） */

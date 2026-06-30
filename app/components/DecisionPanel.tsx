@@ -30,6 +30,14 @@ interface Props {
   maintenanceRefCost?: number
   /** 保全: 設備故障の被害の最大削減率（例 0.7） */
   maxMaintenanceReduction?: number
+  /** 雇用: 1人あたり年給与（未設定で雇用なし） */
+  wage?: number
+  /** 雇用: 1人あたり採用費 */
+  hireCost?: number
+  /** 雇用: 1人あたり退職金 */
+  severance?: number
+  /** 雇用: 現在の従業員数 */
+  headcount?: number
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -83,6 +91,8 @@ const FIELDS: readonly FieldDef[] = [
   { key: 'insuranceSpend', label: '保険料', step: 50_000, hint: '突発ショックの損失をヘッジ' },
   { key: 'maintenanceSpend', label: '保全・点検費', step: 10_000, hint: '' }, // hint は動的
   { key: 'capitalExpenditure', label: '設備投資', step: 100_000, hint: '固定資産↑・現金↓' },
+  { key: 'hire', label: '採用（人数）', step: 1, hint: '' }, // hint は動的
+  { key: 'fire', label: '退職（人数）', step: 1, hint: '' }, // hint は動的
   {
     key: 'financing',
     label: '資金調達（借入＋／返済−）',
@@ -110,6 +120,10 @@ export function DecisionPanel({
   maxInsuranceCoverage,
   maintenanceRefCost,
   maxMaintenanceReduction,
+  wage = 0,
+  hireCost = 0,
+  severance = 0,
+  headcount = 0,
 }: Props) {
   const purchaseCost = materialUnitCost * Math.max(0, decision.purchaseMaterials)
   const insuranceCoverage =
@@ -135,6 +149,9 @@ export function DecisionPanel({
     if (f.key === 'maintenanceSpend')
       return `発生時の被害 −${pct(maintenanceReduction)}（満額 ${yen(fullMaintenance)} で最大 −${pct(maxMaintRed)}）。継続で整備状態↑→故障の発生率↓`
     if (f.key === 'capitalExpenditure') return `${equipmentLabel}↑→${capacityLabel}↑・製造原価↓`
+    if (f.key === 'hire')
+      return `現在 ${headcount}人。採用費 ${yen(hireCost)}/人・給与 年${yen(wage)}/人 → 労働能力↑`
+    if (f.key === 'fire') return `退職金 ${yen(severance)}/人 → 人件費・労働能力↓`
     if (f.key === 'financing') return `格付${creditGrade}・借入上限 ${yen(borrowLimit)}・金利 ${pct(effectiveRate)}`
     return f.hint
   }

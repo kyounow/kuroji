@@ -17,6 +17,18 @@ export function productionCapacity(
 }
 
 /**
+ * 当期の労働による生産能力（数量上限）。従業員数に比例する。
+ *   年間能力 = headcount × laborPerHead、当期能力 = floor(年間能力 × periodFactor)
+ * `laborPerHead` が未設定/0 のときは無制限（＝労働制約なし・後方互換）。
+ * 設備能力との「小さい方」が実際の生産上限になる（設備か人手のボトルネック）。
+ */
+export function laborCapacity(headcount: number, params: SimParams, periodFactor: number): number {
+  const per = params.laborPerHead
+  if (!per || per <= 0) return Number.POSITIVE_INFINITY
+  return Math.floor(Math.max(0, headcount) * per * periodFactor)
+}
+
+/**
  * 設備の規模による製造コストの低減率（規模の経済）。1.0 = 低減なし。
  *   1 − scaleEconomyMax × equipment/(equipment + scaleEconomyHalf)
  * `scaleEconomyMax` が未設定/0 なら 1.0（効果なし）。設備が大きいほど少しずつ原価が下がる。

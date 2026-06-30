@@ -10,7 +10,7 @@ import type {
 import { demandAt } from '@core/market/demand'
 import { productFromRd } from '@core/product/research'
 import { assessCredit } from '@core/finance/credit'
-import { productionCapacity, costEfficiency } from '@core/finance/capacity'
+import { productionCapacity, laborCapacity, costEfficiency } from '@core/finance/capacity'
 
 /** 0..1 にクランプ。 */
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
@@ -55,6 +55,11 @@ export function resolveTurn(
   // 当期の設備投資は当期から有効（期首設備＋当期 capex）。能力・コストに即反映する。
   const opEquipment = bs.fixedAssets.equipment + Math.max(0, decision.capitalExpenditure)
 
+  // 当期の従業員数（採用・退職を当期から反映＝即戦力）。人件費・労働能力を規定する。
+  const hire = Math.max(0, decision.hire)
+  const fire = Math.max(0, decision.fire)
+  const headcount = Math.max(0, (state.headcount ?? 0) + hire - fire)
+
   // 当期の原材料スポット単価（物価 × 市況 × R&D 原価改善 × 設備の規模の経済）
   const spotCost = Math.max(
     0,
@@ -67,8 +72,11 @@ export function resolveTurn(
     ),
   )
 
-  // 当期の生産能力（設備に比例。当期 capex を含む）。
-  const capacity = productionCapacity(opEquipment, params, periodFactor)
+  // 当期の生産能力＝設備能力と労働能力の小さい方（設備か人手のボトルネック）。
+  const capacity = Math.min(
+    productionCapacity(opEquipment, params, periodFactor),
+    laborCapacity(headcount, params, periodFactor),
+  )
 
   // 期首残高
   const cashBegin = bs.currentAssets.cash
@@ -132,8 +140,20 @@ export function resolveTurn(
   const rdSpend = Math.max(0, decision.rdSpend)
   const insuranceSpend = Math.max(0, decision.insuranceSpend)
   const maintenanceSpend = Math.max(0, decision.maintenanceSpend)
+  // 人件費（給与＝従業員数×wage）＋採用費・退職金（一括）。未設定の wage は労働モデル無効＝0。
+  const laborCost = params.wage ? Math.round(headcount * params.wage * inflationIndex * periodFactor) : 0
+  const hiringCost = hire * (params.hireCost ?? 0)
+  const severanceCost = fire * (params.severance ?? 0)
   const operatingExpenses =
-    fixedCosts + depreciation + marketingSpend + rdSpend + insuranceSpend + maintenanceSpend
+    fixedCosts +
+    depreciation +
+    marketingSpend +
+    rdSpend +
+    insuranceSpend +
+    maintenanceSpend +
+    laborCost +
+    hiringCost +
+    severanceCost
   const operatingIncome = grossProfit - operatingExpenses
 
   // 実効金利＝政策金利（マクロ）＋銀行スプレッド＋信用スプレッド（期首の財務状態で評価）。
@@ -248,6 +268,7 @@ export function resolveTurn(
     materialIndex: options.nextMaterialIndex ?? state.materialIndex,
     rdStock: state.rdStock + rdSpend,
     condition: conditionNext,
+    headcount,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,

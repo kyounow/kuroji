@@ -19,7 +19,7 @@ export { totalAssets, totalLiabilities, totalEquity, balances } from './statemen
 export { demandAt } from './market/demand'
 export { computeRatios } from './finance/ratios'
 export { assessCredit, type CreditInfo, type CreditGrade } from './finance/credit'
-export { productionCapacity, costEfficiency } from './finance/capacity'
+export { productionCapacity, laborCapacity, costEfficiency } from './finance/capacity'
 export { breakEven, type BreakEven } from './finance/breakeven'
 export { productFromRd } from './product/research'
 export { materialIndexNext } from './market/material'

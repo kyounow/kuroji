@@ -17,6 +17,8 @@ export const defaultScenario: Scenario = {
     finishedUnits: 50,
     materialIndex: 1.0,
     rdStock: 0,
+    headcount: 5, // 創業メンバー5人。労働能力 5×120/年=600/年=月50（設備能力と同じ＝両方がボトルネック）
+    condition: 1,
     balanceSheet: {
       currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 60_000, finishedGoods: 30_000 },
       fixedAssets: { equipment: 300_000 },
@@ -41,8 +43,13 @@ export const defaultScenario: Scenario = {
     unitVariableCost: 600,
     materialVolatility: 0.15,
     materialMeanReversion: 0.3,
-    fixedCosts: 120_000,
+    fixedCosts: 50_000, // 家賃・その他（人件費は wage に分離）
     depreciationRate: 0.1,
+    // 人的リソース（人件費・労働能力）。初期は人件費 5×14,000=70,000 で旧固定費120,000と均衡。
+    wage: 14_000, // 1人あたり年14,000
+    laborPerHead: 120, // 1人あたり年120個（5人=600/年=月50＝設備能力と同じ）
+    hireCost: 12_000, // 採用費/人
+    severance: 10_000, // 退職金/人
     // 発生主義（売掛・買掛）
     salesOnCreditRatio: 0.3,
     payableRatio: 0.3,

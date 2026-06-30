@@ -8,6 +8,7 @@ import {
   competitorAt,
   marketShare,
   productionCapacity,
+  laborCapacity,
   costEfficiency,
 } from '@core/index'
 import { useGame, previewTurn, shockRiskFor } from './state'
@@ -43,6 +44,8 @@ export function App() {
     insuranceSpend: 0,
     maintenanceSpend: 0,
     capitalExpenditure: 0,
+    hire: 0,
+    fire: 0,
     financing: 0,
   })
   const patch = useCallback((p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p })), [])
@@ -58,6 +61,8 @@ export function App() {
       insuranceSpend: 0,
       maintenanceSpend: 0,
       capitalExpenditure: 0,
+      hire: 0,
+      fire: 0,
       financing: 0,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,12 +130,16 @@ export function App() {
         : `第 ${game.current.turn + 1} 期`
   const unitName = ppy === 4 ? '四半期' : ppy === 12 ? 'ヶ月' : '期'
 
-  // 生産能力（設備に比例。当期の上限）。
-  const capacity = productionCapacity(
+  // 生産能力＝設備能力と労働能力の小さい方（設備か人手のボトルネック）。
+  const equipCapacity = productionCapacity(
     game.current.balanceSheet.fixedAssets.equipment,
     scenario.params,
     1 / ppy,
   )
+  const headcount = game.current.headcount ?? 0
+  const labCapacity = laborCapacity(headcount, scenario.params, 1 / ppy)
+  const capacity = Math.min(equipCapacity, labCapacity)
+  const hasLabor = scenario.params.wage != null
   const equipmentLabel = scenario.params.equipmentLabel ?? '設備'
   const capacityLabel = scenario.params.capacityLabel ?? '生産能力'
 
@@ -272,9 +281,21 @@ export function App() {
               {Number.isFinite(capacity) ? `${num(capacity)}/月` : '無制限'}
             </div>
             <div className="metric-label">
-              {capacityLabel}（{equipmentLabel} {yen(game.current.balanceSheet.fixedAssets.equipment)}）
+              {capacityLabel}
+              {hasLabor && Number.isFinite(capacity) && (
+                <>（{labCapacity <= equipCapacity ? '人手' : equipmentLabel}が制約）</>
+              )}
             </div>
           </div>
+          {hasLabor && (
+            <div className="metric">
+              <div className="metric-value">{num(headcount)}人</div>
+              <div className="metric-label">
+                従業員（労働能力 {Number.isFinite(labCapacity) ? `${num(labCapacity)}/月` : '—'}・設備{' '}
+                {Number.isFinite(equipCapacity) ? `${num(equipCapacity)}/月` : '無制限'}）
+              </div>
+            </div>
+          )}
           <div className="metric">
             <div className="metric-value">−{pct(1 - product.unitCostModifier)} / +{pct(product.demandModifier - 1)}</div>
             <div className="metric-label">R&D 原価減 / 需要増</div>
@@ -338,6 +359,10 @@ export function App() {
         maxInsuranceCoverage={scenario.params.maxInsuranceCoverage}
         maintenanceRefCost={scenario.params.maintenanceRefCost}
         maxMaintenanceReduction={scenario.params.maxMaintenanceReduction}
+        wage={scenario.params.wage}
+        hireCost={scenario.params.hireCost}
+        severance={scenario.params.severance}
+        headcount={headcount}
       />
 
       {!gameOver && (

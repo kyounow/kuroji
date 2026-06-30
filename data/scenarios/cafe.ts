@@ -15,6 +15,8 @@ export const cafeScenario: Scenario = {
     finishedUnits: 50, // 仕込み 50 × 200 = 10,000
     materialIndex: 1.0,
     rdStock: 0,
+    headcount: 8, // スタッフ8人。労働＝接客（来客キャパ）。8×375/年=3,000/年=月250（店舗キャパと同じ）
+    condition: 1,
     balanceSheet: {
       currentAssets: { cash: 500_000, accountsReceivable: 0, rawMaterials: 20_000, finishedGoods: 10_000 },
       fixedAssets: { equipment: 400_000 },
@@ -38,8 +40,13 @@ export const cafeScenario: Scenario = {
     unitVariableCost: 200,
     materialVolatility: 0.2,
     materialMeanReversion: 0.3,
-    fixedCosts: 360_000, // 家賃・人件費（年）
+    fixedCosts: 120_000, // 家賃・その他（人件費は wage に分離）
     depreciationRate: 0.1,
+    // 人的リソース（接客が中心の労働集約）。初期人件費 8×30,000=240,000 で旧360,000と均衡。
+    wage: 30_000,
+    laborPerHead: 375, // 1人あたり年375人（8人=3,000/年=月250＝来客キャパと同じ）
+    hireCost: 15_000,
+    severance: 12_000,
     salesOnCreditRatio: 0.05,
     payableRatio: 0.4,
     marketingEffect: 0.4,

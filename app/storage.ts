@@ -28,7 +28,7 @@ export function saveBest(scenarioId: string, total: number): number {
 // ---- ゲームの続き（全状態セーブ） ----
 // version はゲーム状態のスキーマ版。破壊的変更時に上げると古いセーブは無効化される。
 const SAVE_KEY = 'kuroji.save'
-const SAVE_VERSION = 3 // フェーズC（マクロ経済を GameState に追加）でスキーマ変更
+const SAVE_VERSION = 4 // Phase1（人的リソース headcount・整備状態 condition を CompanyState に追加）
 
 /** 現在のゲーム状態を保存する（自動保存）。型は呼び出し側が保証する。 */
 export function saveGame(state: unknown): void {

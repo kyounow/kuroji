@@ -15,6 +15,8 @@ export const startupScenario: Scenario = {
     finishedUnits: 0,
     materialIndex: 1.0,
     rdStock: 0,
+    headcount: 4, // エンジニア4人。労働＝処理能力。4×60/年=240/年=月20（サーバー処理能力と同じ）
+    condition: 1,
     balanceSheet: {
       currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 50_000, finishedGoods: 0 },
       fixedAssets: { equipment: 200_000 },
@@ -38,8 +40,13 @@ export const startupScenario: Scenario = {
     unitVariableCost: 500,
     materialVolatility: 0.1,
     materialMeanReversion: 0.4,
-    fixedCosts: 600_000, // エンジニア人件費（年）
+    fixedCosts: 40_000, // オフィス・その他（人件費は wage に分離）
     depreciationRate: 0.2, // 陳腐化が速い
+    // 人的リソース（エンジニアが価値の源泉＝労働集約）。初期人件費 4×140,000=560,000 で旧600,000と均衡。
+    wage: 140_000, // エンジニア年俸
+    laborPerHead: 60, // 1人あたり年60件（4人=240/年=月20＝処理能力と同じ）
+    hireCost: 30_000, // 採用が高い
+    severance: 25_000,
     salesOnCreditRatio: 0.6,
     payableRatio: 0.3,
     marketingEffect: 0.6,

@@ -13,6 +13,8 @@ const decide = (d: Partial<Decision> = {}): Decision => ({
   insuranceSpend: 0,
   maintenanceSpend: 0,
   capitalExpenditure: 0,
+  hire: 0,
+  fire: 0,
   financing: 0,
   ...d,
 })
@@ -464,6 +466,63 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(r.capacity).toBe(200)
     expect(r.state.finishedUnits).toBe(initialState.finishedUnits + 200) // 1000要求でも200まで
     expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  // --- 人的リソース（雇用・人件費・労働能力） ---
+  const laborParams: SimParams = {
+    ...BASE_PARAMS,
+    wage: 12_000,
+    laborPerHead: 120,
+    hireCost: 10_000,
+    severance: 8_000,
+  }
+
+  it('生産能力は設備能力と労働能力の小さい方（設備か人手のボトルネック）', () => {
+    // 設備 4,000,000×0.0006/12 = 200/月、労働 5人×120/12 = 50/月 → min=50（人手律速）
+    const params: SimParams = { ...laborParams, capacityPerEquipment: 0.0006 }
+    const r1 = resolveTurn({ ...BASE_STATE, headcount: 5 }, decide({}), params)
+    expect(r1.capacity).toBe(50)
+    // 20人に増やすと労働 20×120/12 = 200/月 → min(200,200)=200（設備律速に切替）
+    const r2 = resolveTurn({ ...BASE_STATE, headcount: 20 }, decide({}), params)
+    expect(r2.capacity).toBe(200)
+  })
+
+  it('労働能力が生産数量の上限になる（手持ち原材料は十分でも人手で頭打ち）', () => {
+    const state: CompanyState = { ...BASE_STATE, headcount: 5 }
+    const r = resolveTurn(state, decide({ purchaseMaterials: 1_000, produceUnits: 1_000 }), laborParams)
+    expect(r.capacity).toBe(50) // 5人×120/12
+    expect(r.state.finishedUnits).toBeLessThanOrEqual(state.finishedUnits + 50)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('人件費・採用費・退職金が販管費に乗り、従業員数が更新される（恒等式維持）', () => {
+    const state: CompanyState = { ...BASE_STATE, headcount: 5 }
+    const baseR = resolveTurn(state, decide({}), laborParams) // 人件費 5×12,000/12 = 5,000/月
+    const hired = resolveTurn(state, decide({ hire: 2 }), laborParams)
+    expect(hired.state.headcount).toBe(7)
+    // 人件費増 +2,000（7×12,000/12=7,000）＋ 採用費 2×10,000=20,000 → opEx +22,000
+    expect(
+      hired.incomeStatement.operatingExpenses - baseR.incomeStatement.operatingExpenses,
+    ).toBe(22_000)
+    expect(balances(hired.state.balanceSheet)).toBe(true)
+
+    const fired = resolveTurn(state, decide({ fire: 1 }), laborParams)
+    expect(fired.state.headcount).toBe(4)
+    // 人件費減 −1,000（4×12,000/12=4,000）＋ 退職金 8,000 → opEx +7,000
+    expect(
+      fired.incomeStatement.operatingExpenses - baseR.incomeStatement.operatingExpenses,
+    ).toBe(7_000)
+    expect(balances(fired.state.balanceSheet)).toBe(true)
+  })
+
+  it('労働モデル未設定なら人件費・労働制約なし（後方互換）', () => {
+    const r = resolveTurn(
+      { ...BASE_STATE, headcount: 5 },
+      decide({ produceUnits: 100, purchaseMaterials: 100, hire: 3 }),
+      BASE_PARAMS,
+    )
+    expect(r.capacity).toBe(Number.POSITIVE_INFINITY) // capacityPerEquipment も laborPerHead も未設定
+    expect(r.state.headcount).toBe(8) // 数は更新されるが費用は発生しない
   })
 
   it('設備が大きいほど実効原価が下がる（規模の経済）', () => {
