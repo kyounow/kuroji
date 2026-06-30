@@ -461,6 +461,54 @@ button.ghost {
   border-color: var(--accent);
 }
 
+/* トップレベルの表示タブ（事業 / 財務 / 市況） */
+.viewtabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.viewtabs button {
+  font: inherit;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.55rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.viewtabs button:hover {
+  border-color: var(--accent);
+}
+
+.viewtabs button.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.viewtabs-sub {
+  font-size: 0.72rem;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+@media (max-width: 420px) {
+  .viewtabs-sub {
+    display: none;
+  }
+}
+
 .card {
   border: 1px solid var(--border);
   border-radius: 8px;

@@ -26,6 +26,9 @@ import { SettingsModal } from './components/SettingsModal'
 import { loadBest, saveBest } from './storage'
 import { yen, yenSigned, pct, num } from './format'
 
+/** 表示タブ。事業＝経営判断、財務＝三表・指標、市況＝景気・競合。 */
+type View = 'business' | 'finance' | 'market'
+
 export function App() {
   const { game, scenario, play, reset, newGame, scenarios, modes, upcomingEvent } = useGame()
   const gameOver = game.outcome !== 'playing'
@@ -35,6 +38,24 @@ export function App() {
     () => game.history.length === 0 && game.current.turn === 0,
   )
   const currentModeName = modes.find((m) => m.id === game.mode)?.name ?? game.mode
+
+  // 表示タブ（事業 / 財務 / 市況）。最後に見たタブを localStorage で記憶（セーブ本体とは別キー）。
+  const [view, setView] = useState<View>(() => {
+    try {
+      const saved = localStorage.getItem('kuroji.view')
+      if (saved === 'finance' || saved === 'market' || saved === 'business') return saved
+    } catch {
+      /* localStorage 不可なら既定 */
+    }
+    return 'business'
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem('kuroji.view', view)
+    } catch {
+      /* 保存失敗は無視 */
+    }
+  }, [view])
 
   const [decision, setDecision] = useState<Decision>({
     unitPrice: scenario.params.basePrice,
@@ -176,8 +197,7 @@ export function App() {
         </div>
       </header>
       <p className="lead">
-        価格・生産・販促・投資・資金調達を決めて1期ずつ経営し、財務三表の動きを見ながら
-        <strong>純資産（黒字）を増やす</strong>のが目標です。
+        1期ずつ経営し、財務三表を見ながら<strong>純資産（黒字）を増やす</strong>のが目標。
       </p>
 
       <section className="status">
@@ -260,8 +280,38 @@ export function App() {
         shockRisk={shockRisk}
       />
 
-      <MacroPanel macro={game.macro} effectiveRate={effectiveRate} />
+      <nav className="viewtabs" role="tablist" aria-label="表示を切り替え">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'business'}
+          className={view === 'business' ? 'on' : ''}
+          onClick={() => setView('business')}
+        >
+          🏭 事業<span className="viewtabs-sub">経営判断・予測</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'finance'}
+          className={view === 'finance' ? 'on' : ''}
+          onClick={() => setView('finance')}
+        >
+          📊 財務<span className="viewtabs-sub">三表・指標・履歴</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'market'}
+          className={view === 'market' ? 'on' : ''}
+          onClick={() => setView('market')}
+        >
+          🌐 市況<span className="viewtabs-sub">景気・競合</span>
+        </button>
+      </nav>
 
+      {view === 'business' && (
+        <>
       <section className="product">
         <h2>製品・原材料の状態</h2>
         <div className="product-grid">
@@ -329,29 +379,6 @@ export function App() {
         </p>
       </section>
 
-      {hasCompetitor && (
-        <section className="product">
-          <h2>競合・市場シェア</h2>
-          <div className="product-grid">
-            <div className="metric">
-              <div className="metric-value">{yen(competitor.price)}</div>
-              <div className="metric-label">競合の価格</div>
-            </div>
-            <div className="metric">
-              <div className="metric-value">{competitor.quality.toFixed(2)}</div>
-              <div className="metric-label">競合の品質（自社 {product.demandModifier.toFixed(2)}）</div>
-            </div>
-            <div className="metric">
-              <div className={`metric-value ${ourShare >= 0.5 ? 'ok' : 'ng'}`}>{pct(ourShare)}</div>
-              <div className="metric-label">自社シェア（この価格での試算）</div>
-            </div>
-          </div>
-          <p className="muted small">
-            シェアは「価格あたり品質」で競合と取り合います。値下げや研究開発（品質）でシェアが伸び、需要に反映されます。
-          </p>
-        </section>
-      )}
-
       <DecisionPanel
         decision={decision}
         onChange={patch}
@@ -387,7 +414,11 @@ export function App() {
           demandNoise={scenario.params.demandNoise ?? 0}
         />
       )}
+        </>
+      )}
 
+      {view === 'finance' && (
+        <>
       <HistoryTable
         history={game.history}
         selectedTurn={selectedTurn}
@@ -421,6 +452,39 @@ export function App() {
       />
 
       <HistoryChart initial={scenario.initialState} history={game.history} />
+        </>
+      )}
+
+      {view === 'market' && (
+        <>
+          <MacroPanel macro={game.macro} effectiveRate={effectiveRate} />
+
+          {hasCompetitor ? (
+            <section className="product">
+              <h2>競合・市場シェア</h2>
+              <div className="product-grid">
+                <div className="metric">
+                  <div className="metric-value">{yen(competitor.price)}</div>
+                  <div className="metric-label">競合の価格</div>
+                </div>
+                <div className="metric">
+                  <div className="metric-value">{competitor.quality.toFixed(2)}</div>
+                  <div className="metric-label">競合の品質（自社 {product.demandModifier.toFixed(2)}）</div>
+                </div>
+                <div className="metric">
+                  <div className={`metric-value ${ourShare >= 0.5 ? 'ok' : 'ng'}`}>{pct(ourShare)}</div>
+                  <div className="metric-label">自社シェア（この価格での試算）</div>
+                </div>
+              </div>
+              <p className="muted small">
+                シェアは「価格あたり品質」で競合と取り合います。値下げや研究開発（品質）でシェアが伸び、需要に反映されます。
+              </p>
+            </section>
+          ) : (
+            <p className="muted small">このシナリオには直接の競合はいません（市場を独占的に供給）。</p>
+          )}
+        </>
+      )}
 
       <footer className="muted small">
         ※ 学習用の簡略モデルです。会計実務や実在企業の財務再現ではありません。
