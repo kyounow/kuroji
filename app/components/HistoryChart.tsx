@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { totalEquity, type CompanyState } from '@core/index'
 import type { TurnRecord } from '../state'
 import { yen } from '../format'
@@ -17,7 +18,10 @@ function downsample<T>(arr: T[], max: number): T[] {
 }
 
 /** 純資産と現金の推移を描く簡易折れ線グラフ（依存ライブラリなしの SVG）。 */
-export function HistoryChart({ initial, history }: Props) {
+/** 純資産・現金の推移は game 依存のみ。判断入力で再renderしないよう memo 化。 */
+export const HistoryChart = memo(HistoryChartImpl)
+
+function HistoryChartImpl({ initial, history }: Props) {
   // 期0（期首）＋各期末の系列。長期は ≤120 点に間引く。
   const allStates = [initial, ...history.map((h) => h.stateAfter)]
   const states = downsample(allStates, 120)

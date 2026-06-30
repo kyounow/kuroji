@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import {
   totalAssets,
   totalLiabilities,
@@ -33,7 +33,10 @@ function Row({ label, value, kind }: { label: string; value: number; kind?: 'sub
 }
 
 /** 財務三表。1つずつ大きく（タブ切替）／3つ並べて、グラフ／表 を切り替えられる。 */
-export function StatementsView({ state, last, periodsPerYear, history }: Props) {
+/** 三表＋推移チャートは game/selected 依存のみ。判断入力で再renderしないよう memo 化（配下チャートも巻き込み防止）。 */
+export const StatementsView = memo(StatementsViewImpl)
+
+function StatementsViewImpl({ state, last, periodsPerYear, history }: Props) {
   const plabel = (turn: number) => periodLabel(turn, periodsPerYear)
   const [mode, setMode] = useState<Mode>('chart')
   const [layout, setLayout] = useState<Layout>('focus')

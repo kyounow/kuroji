@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react'
+import { memo, useState, Fragment } from 'react'
 import { totalEquity } from '@core/index'
 import type { TurnRecord } from '../state'
 import { yen } from '../format'
@@ -31,7 +31,10 @@ interface YearGroup {
 }
 
 /** 月次の履歴を年度ごとにまとめ、年間サマリー＋（展開時）月別行で見やすく表示する。 */
-export function HistoryTable({ history, selectedTurn, onSelect, periodsPerYear }: Props) {
+/** 履歴は game 依存のみ。判断入力では再renderしないよう memo 化（参照安定な props 前提）。 */
+export const HistoryTable = memo(HistoryTableImpl)
+
+function HistoryTableImpl({ history, selectedTurn, onSelect, periodsPerYear }: Props) {
   const ppy = periodsPerYear || 1
   const [openYears, setOpenYears] = useState<number[]>([])
 

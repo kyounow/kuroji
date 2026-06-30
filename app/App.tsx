@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Decision } from '@core/index'
 import {
   totalEquity,
@@ -45,7 +45,7 @@ export function App() {
     capitalExpenditure: 0,
     financing: 0,
   })
-  const patch = (p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p }))
+  const patch = useCallback((p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p })), [])
 
   // シナリオを切り替えたら判断の初期値もそのシナリオ向けに戻す。
   useEffect(() => {
@@ -68,7 +68,10 @@ export function App() {
   useEffect(() => {
     setSelectedTurn(game.history.length)
   }, [game.history.length])
-  const selected = selectedTurn > 0 ? game.history[selectedTurn - 1] : null
+  const selected = useMemo(
+    () => (selectedTurn > 0 ? game.history[selectedTurn - 1] : null),
+    [game.history, selectedTurn],
+  )
 
   const equity = totalEquity(game.current.balanceSheet)
   const startEquity = totalEquity(scenario.initialState.balanceSheet)
