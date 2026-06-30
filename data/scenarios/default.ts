@@ -12,7 +12,7 @@ export const defaultScenario: Scenario = {
     'ごく小さな製造の会社を創業する。設備投資で生産能力を広げ、価格・研究開発・資金繰りを判断して黒字経営を目指す。',
   initialState: {
     turn: 0,
-    // 基準単価 600 円で評価: 原材料 100個=60,000 / 製品 50個=30,000
+    // 基準単価 520 円で評価: 原材料 100個=52,000 / 製品 50個=26,000
     materialUnits: 100,
     finishedUnits: 50,
     materialIndex: 1.0,
@@ -21,11 +21,11 @@ export const defaultScenario: Scenario = {
     condition: 1,
     sharesOutstanding: 1_000, // 創業株式1,000株（純資産99万 → 1株あたり約990円）
     balanceSheet: {
-      currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 60_000, finishedGoods: 30_000 },
+      currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 52_000, finishedGoods: 26_000 },
       fixedAssets: { equipment: 300_000 },
       currentLiabilities: { accountsPayable: 0, shortTermDebt: 0 },
       nonCurrentLiabilities: { longTermDebt: 400_000 },
-      equity: { capitalStock: 800_000, retainedEarnings: 190_000 },
+      equity: { capitalStock: 800_000, retainedEarnings: 178_000 },
     },
   },
   params: {
@@ -41,7 +41,7 @@ export const defaultScenario: Scenario = {
     scaleEconomyMax: 0.2,
     scaleEconomyHalf: 2_000_000,
     // コスト・原材料
-    unitVariableCost: 600,
+    unitVariableCost: 520, // 粗利を確保（創業の薄利でも黒字が出る水準に調整）
     materialVolatility: 0.15,
     materialMeanReversion: 0.3,
     fixedCosts: 50_000, // 家賃・その他（人件費は wage に分離）
@@ -65,8 +65,8 @@ export const defaultScenario: Scenario = {
     maintenanceRefCost: 30_000, // この保全費で最大軽減に到達
     maxMaintenanceReduction: 0.7, // 予防保全で設備故障の被害を最大70%軽減
     // 故障・リコールは「発生確率リスク」。積み上げた整備状態・品質で発火率が下がる。
-    conditionDecay: 0.03, // 整備状態は毎月3%劣化
-    conditionGainPerRefCost: 0.1, // 保全費30,000で整備状態+0.1（半額で劣化と均衡）
+    conditionDecay: 0.015, // 整備状態は毎月1.5%劣化（保全費で“維持”が手頃に＝月4,500で均衡）
+    conditionGainPerRefCost: 0.1, // 保全費30,000で整備状態+0.1
     conditionShield: 0.85, // 整備状態満点で故障発火率を最大85%減
     breakdownBaseRate: 1.0, // 放置（整備状態0）なら引かれた故障は必ず発火
     recallBaseRate: 0.8, // 品質0でも引かれたリコールの80%が発火
@@ -86,8 +86,8 @@ export const defaultScenario: Scenario = {
   turnLimit: 96, // 8年（96ヶ月）
   goal: {
     kind: 'equityTarget',
-    label: '純資産を 200万円にする',
-    target: 2_000_000,
+    label: '純資産を 150万円にする',
+    target: 1_500_000,
     withinTurns: 96,
   },
 }

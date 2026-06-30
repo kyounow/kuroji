@@ -31,7 +31,7 @@ export const startupScenario: Scenario = {
     baseDemand: 240,
     basePrice: 5_000,
     priceElasticity: 0.8,
-    competitorStrength: 0.5,
+    competitorStrength: 0.35, // 研究開発で差別化する想定。競合は中程度に
     demandNoise: 0.25, // 受注は読みにくい
     capacityPerEquipment: 0.0012, // サーバー20万 → 年間240 → 月次20
     scaleEconomyMax: 0.4, // 自動化で限界費用が下がる
@@ -58,7 +58,7 @@ export const startupScenario: Scenario = {
     maxInsuranceCoverage: 0.8,
     maintenanceRefCost: 40_000,
     maxMaintenanceReduction: 0.7,
-    conditionDecay: 0.03,
+    conditionDecay: 0.015,
     conditionGainPerRefCost: 0.1,
     conditionShield: 0.85,
     breakdownBaseRate: 1.0,
@@ -76,8 +76,8 @@ export const startupScenario: Scenario = {
   turnLimit: 96,
   goal: {
     kind: 'equityTarget',
-    label: '純資産を 200万円にする',
-    target: 2_000_000,
+    label: '純資産を 150万円にする',
+    target: 1_500_000,
     withinTurns: 96,
   },
 }

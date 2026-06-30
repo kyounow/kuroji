@@ -100,7 +100,7 @@ function evalGoal(
   return evaluateGoal(goal, current, scenario.initialState)
 }
 
-function makeInitial(scenarioId: string, seed: number, mode: GameMode): GameState {
+export function makeInitial(scenarioId: string, seed: number, mode: GameMode): GameState {
   const scenario = getScenario(scenarioId)
   return {
     scenarioId,
@@ -236,6 +236,64 @@ export function shockRiskFor(game: GameState): { kind: 'breakdown' | 'recall'; r
   return null
 }
 
+/**
+ * 1ターン進める純粋関数（reducer の 'play' 本体）。React 非依存なのでヘッドレスのシミュレーション
+ * （バランス診断）からも再利用できる。終了済みならそのまま返す。
+ */
+export function advanceTurn(game: GameState, decision: Decision): GameState {
+  if (game.outcome !== 'playing') return game
+  const scenario = getScenario(game.scenarioId)
+  const eventTable = getEventTable(scenario.eventTableId)
+  const drawn = drawEvent(eventTable, game.seed, game.current.turn)
+  // ショックの発火判定（保全/品質で発生率↓）。回避なら影響なしの実効イベントに差し替え。
+  const event = shockFired(game, drawn) ? drawn : avertedEvent(drawn)
+  const result = resolveTurn(game.current, decision, scenario.params, {
+    ...turnOptionsFor(game, decision, event),
+    demandNoise: demandNoiseFor(game), // 確定時のみ需要ブレを適用（プレビューには出さない）
+    lossSeverity: lossSeverityFor(game), // 確定時のみショック毀損度を適用（プレビューは中心値）
+  })
+  const nextMacro = advanceMacro(game.macro, scenario.params, game.seed, game.current.turn)
+  const record: TurnRecord = {
+    turn: result.state.turn,
+    event,
+    decision,
+    unitsSold: result.unitsSold,
+    effectiveUnitCost: result.effectiveUnitCost,
+    incomeStatement: result.incomeStatement,
+    cashFlow: result.cashFlow,
+    ratios: computeRatios(result.state.balanceSheet, result.incomeStatement),
+    stateAfter: result.state,
+  }
+
+  const bankrupt = isBankrupt(result.state)
+  let goalStatus = evalGoal(game.scenarioId, result.state, game.mode)
+  let goalAchieved = game.goalAchieved
+
+  let outcome: Outcome = 'playing'
+  if (bankrupt) {
+    outcome = 'lost'
+    if (goalStatus) goalStatus = { ...goalStatus, status: 'lost', detail: '倒産' }
+  } else if (game.mode === 'challenge') {
+    // チャレンジ: 目標達成/期限切れでゲーム終了。
+    if (goalStatus) outcome = goalStatus.status === 'progress' ? 'playing' : goalStatus.status
+    else if (scenario.turnLimit && result.state.turn >= scenario.turnLimit) outcome = 'won'
+  } else {
+    // エンドレス: 目標達成はマイルストーン（継続）。期限切れは無し（deadline 除去済み）。
+    if (goalStatus && goalStatus.status === 'won') goalAchieved = true
+    if (result.state.turn >= MAX_TURNS) outcome = 'won' // 100年完走
+  }
+
+  return {
+    ...game,
+    current: result.state,
+    macro: nextMacro,
+    history: [...game.history, record].slice(-MAX_TURNS),
+    outcome,
+    goalStatus,
+    goalAchieved,
+  }
+}
+
 function reducer(game: GameState, action: Action): GameState {
   switch (action.type) {
     case 'select':
@@ -246,59 +304,8 @@ function reducer(game: GameState, action: Action): GameState {
       return makeInitial(action.scenarioId, game.seed, action.mode)
     case 'reset':
       return makeInitial(game.scenarioId, game.seed, game.mode)
-    case 'play': {
-      if (game.outcome !== 'playing') return game
-      const scenario = getScenario(game.scenarioId)
-      const eventTable = getEventTable(scenario.eventTableId)
-      const drawn = drawEvent(eventTable, game.seed, game.current.turn)
-      // ショックの発火判定（保全/品質で発生率↓）。回避なら影響なしの実効イベントに差し替え。
-      const event = shockFired(game, drawn) ? drawn : avertedEvent(drawn)
-      const result = resolveTurn(game.current, action.decision, scenario.params, {
-        ...turnOptionsFor(game, action.decision, event),
-        demandNoise: demandNoiseFor(game), // 確定時のみ需要ブレを適用（プレビューには出さない）
-        lossSeverity: lossSeverityFor(game), // 確定時のみショック毀損度を適用（プレビューは中心値）
-      })
-      const nextMacro = advanceMacro(game.macro, scenario.params, game.seed, game.current.turn)
-      const record: TurnRecord = {
-        turn: result.state.turn,
-        event,
-        decision: action.decision,
-        unitsSold: result.unitsSold,
-        effectiveUnitCost: result.effectiveUnitCost,
-        incomeStatement: result.incomeStatement,
-        cashFlow: result.cashFlow,
-        ratios: computeRatios(result.state.balanceSheet, result.incomeStatement),
-        stateAfter: result.state,
-      }
-
-      const bankrupt = isBankrupt(result.state)
-      let goalStatus = evalGoal(game.scenarioId, result.state, game.mode)
-      let goalAchieved = game.goalAchieved
-
-      let outcome: Outcome = 'playing'
-      if (bankrupt) {
-        outcome = 'lost'
-        if (goalStatus) goalStatus = { ...goalStatus, status: 'lost', detail: '倒産' }
-      } else if (game.mode === 'challenge') {
-        // チャレンジ: 目標達成/期限切れでゲーム終了。
-        if (goalStatus) outcome = goalStatus.status === 'progress' ? 'playing' : goalStatus.status
-        else if (scenario.turnLimit && result.state.turn >= scenario.turnLimit) outcome = 'won'
-      } else {
-        // エンドレス: 目標達成はマイルストーン（継続）。期限切れは無し（deadline 除去済み）。
-        if (goalStatus && goalStatus.status === 'won') goalAchieved = true
-        if (result.state.turn >= MAX_TURNS) outcome = 'won' // 100年完走
-      }
-
-      return {
-        ...game,
-        current: result.state,
-        macro: nextMacro,
-        history: [...game.history, record].slice(-MAX_TURNS),
-        outcome,
-        goalStatus,
-        goalAchieved,
-      }
-    }
+    case 'play':
+      return advanceTurn(game, action.decision)
   }
 }
 

@@ -58,7 +58,7 @@ export const cafeScenario: Scenario = {
     maxInsuranceCoverage: 0.8,
     maintenanceRefCost: 20_000,
     maxMaintenanceReduction: 0.7,
-    conditionDecay: 0.03,
+    conditionDecay: 0.015,
     conditionGainPerRefCost: 0.1,
     conditionShield: 0.85,
     breakdownBaseRate: 1.0,
