@@ -17,10 +17,9 @@ const SCENARIOS: Record<string, Scenario> = Object.fromEntries(
   SCENARIO_LIST.map((s) => [s.id, s]),
 )
 
-/** 選択可能なシナリオの一覧（id と表示名、表示順）。 */
-export const AVAILABLE_SCENARIOS: ReadonlyArray<{ id: string; name: string }> = SCENARIO_LIST.map(
-  (s) => ({ id: s.id, name: s.name }),
-)
+/** 選択可能なシナリオの一覧（id・表示名・説明、表示順）。 */
+export const AVAILABLE_SCENARIOS: ReadonlyArray<{ id: string; name: string; description: string }> =
+  SCENARIO_LIST.map((s) => ({ id: s.id, name: s.name, description: s.description }))
 
 /** ID からシナリオを取得する。未知の ID はエラー。 */
 export function getScenario(id: string): Scenario {

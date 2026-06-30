@@ -6,7 +6,6 @@ interface Props {
   decision: Decision
   onChange: (patch: Partial<Decision>) => void
   onPlay: () => void
-  onReset: () => void
   disabled: boolean
   /** 当期の原材料スポット単価（仕入の単価表示に使用） */
   materialUnitCost: number
@@ -93,7 +92,6 @@ export function DecisionPanel({
   decision,
   onChange,
   onPlay,
-  onReset,
   disabled,
   materialUnitCost,
   enabled,
@@ -149,9 +147,6 @@ export function DecisionPanel({
       <div className="actions">
         <button onClick={onPlay} disabled={disabled}>
           この判断で1期すすめる ▶
-        </button>
-        <button className="ghost" onClick={onReset}>
-          最初からやり直す
         </button>
       </div>
       <p className="muted small">

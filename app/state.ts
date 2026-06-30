@@ -36,9 +36,17 @@ const MAX_TURNS = 1200
 
 /** ゲームモード。endless=期限なし(負けは倒産のみ・目標はマイルストーン)、challenge=期限付き目標で勝敗。 */
 export type GameMode = 'endless' | 'challenge'
-export const GAME_MODES: { id: GameMode; name: string }[] = [
-  { id: 'challenge', name: 'チャレンジ（期限付き目標）' },
-  { id: 'endless', name: 'エンドレス（じっくり経営）' },
+export const GAME_MODES: { id: GameMode; name: string; description: string }[] = [
+  {
+    id: 'challenge',
+    name: 'チャレンジ（期限付き目標）',
+    description: '期限内に目標（純資産など）を達成すればクリア。期限切れ・倒産で終了。手応え重視。',
+  },
+  {
+    id: 'endless',
+    name: 'エンドレス（じっくり経営）',
+    description: '期限なし。倒産しない限り続けられ、目標はマイルストーン。最大100年の長期サンドボックス。',
+  },
 ]
 
 /** 1ターンの記録（履歴・グラフ用）。 */
@@ -112,6 +120,7 @@ type Action =
   | { type: 'reset' }
   | { type: 'select'; scenarioId: string }
   | { type: 'setMode'; mode: GameMode }
+  | { type: 'newGame'; scenarioId: string; mode: GameMode }
 
 /** 倒産判定: 現金がマイナス、または債務超過（純資産マイナス）。 */
 function isBankrupt(state: CompanyState): boolean {
@@ -178,6 +187,8 @@ function reducer(game: GameState, action: Action): GameState {
       return makeInitial(action.scenarioId, game.seed, game.mode)
     case 'setMode':
       return makeInitial(game.scenarioId, game.seed, action.mode)
+    case 'newGame':
+      return makeInitial(action.scenarioId, game.seed, action.mode)
     case 'reset':
       return makeInitial(game.scenarioId, game.seed, game.mode)
     case 'play': {
@@ -258,6 +269,10 @@ export function useGame() {
     [],
   )
   const setMode = useCallback((mode: GameMode) => dispatch({ type: 'setMode', mode }), [])
+  const newGame = useCallback(
+    (scenarioId: string, mode: GameMode) => dispatch({ type: 'newGame', scenarioId, mode }),
+    [],
+  )
 
   const scenario = getScenario(game.scenarioId)
   const eventTable = getEventTable(scenario.eventTableId)
@@ -275,6 +290,7 @@ export function useGame() {
     reset,
     selectScenario,
     setMode,
+    newGame,
     scenarios: AVAILABLE_SCENARIOS,
     modes: GAME_MODES,
     upcomingEvent,

@@ -20,13 +20,19 @@ import { HistoryChart } from './components/HistoryChart'
 import { MacroPanel } from './components/MacroPanel'
 import { ForecastPanel } from './components/ForecastPanel'
 import { ScoreCard } from './components/ScoreCard'
+import { SettingsModal } from './components/SettingsModal'
 import { loadBest, saveBest } from './storage'
 import { yen, yenSigned, pct, num } from './format'
 
 export function App() {
-  const { game, scenario, play, reset, selectScenario, setMode, scenarios, modes, upcomingEvent } =
-    useGame()
+  const { game, scenario, play, reset, newGame, scenarios, modes, upcomingEvent } = useGame()
   const gameOver = game.outcome !== 'playing'
+
+  // ゲーム設定（シナリオ・モード）のポップアップ。新規（履歴なし）の起動時は自動で開く。
+  const [settingsOpen, setSettingsOpen] = useState(
+    () => game.history.length === 0 && game.current.turn === 0,
+  )
+  const currentModeName = modes.find((m) => m.id === game.mode)?.name ?? game.mode
 
   const [decision, setDecision] = useState<Decision>({
     unitPrice: scenario.params.basePrice,
@@ -133,13 +139,24 @@ export function App() {
 
   return (
     <main className="app">
-      <header>
-        <h1>kuroji — 会計で学ぶ経営シミュレーション</h1>
-        <p className="lead">
-          価格・生産・販促・投資・資金調達を決めて1期ずつ経営し、財務三表の動きを見ながら
-          <strong>純資産（黒字）を増やす</strong>のが目標です。
-        </p>
+      <header className="topbar">
+        <div className="topbar-title">
+          <h1>kuroji</h1>
+          <span className="muted small">会計で学ぶ経営シミュレーション</span>
+        </div>
+        <div className="topbar-actions">
+          <button className="ghost" onClick={() => setSettingsOpen(true)}>
+            ⚙ 設定
+          </button>
+          <button className="ghost" onClick={reset}>
+            ↻ 最初からやり直す
+          </button>
+        </div>
       </header>
+      <p className="lead">
+        価格・生産・販促・投資・資金調達を決めて1期ずつ経営し、財務三表の動きを見ながら
+        <strong>純資産（黒字）を増やす</strong>のが目標です。
+      </p>
 
       <section className="status">
         <div>
@@ -164,29 +181,13 @@ export function App() {
           <span className={`credit-grade grade-${credit.grade}`}>{credit.grade}</span>{' '}
           <span className="muted small">金利 {pct(effectiveRate)}</span>
         </div>
-        <label className="scenario-select">
-          <span className="muted small">シナリオ</span>
-          <select
-            value={game.scenarioId}
-            onChange={(e) => selectScenario(e.target.value)}
-          >
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="scenario-select">
-          <span className="muted small">モード</span>
-          <select value={game.mode} onChange={(e) => setMode(e.target.value as typeof game.mode)}>
-            {modes.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div>
+          <span className="muted small">シナリオ</span> <span>{scenario.name}</span>
+          <span className="muted small"> ／ {currentModeName}</span>{' '}
+          <button className="link-btn" onClick={() => setSettingsOpen(true)}>
+            変更
+          </button>
+        </div>
       </section>
 
       {game.mode === 'endless' && game.goalAchieved && !gameOver && (
@@ -307,7 +308,6 @@ export function App() {
         decision={decision}
         onChange={patch}
         onPlay={() => play(decision)}
-        onReset={reset}
         disabled={gameOver}
         materialUnitCost={spotCost}
         enabled={scenario.enabledDecisions}
@@ -354,6 +354,21 @@ export function App() {
       <footer className="muted small">
         ※ 学習用の簡略モデルです。会計実務や実在企業の財務再現ではありません。
       </footer>
+
+      {settingsOpen && (
+        <SettingsModal
+          scenarios={scenarios}
+          modes={modes}
+          currentScenarioId={game.scenarioId}
+          currentMode={game.mode}
+          hasProgress={game.history.length > 0}
+          onStart={(scenarioId, mode) => {
+            newGame(scenarioId, mode)
+            setSettingsOpen(false)
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </main>
   )
 }
