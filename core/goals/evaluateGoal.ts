@@ -26,36 +26,38 @@ export function evaluateGoal(goal: Goal, current: CompanyState, initial: Company
       const start = totalEquity(initial.balanceSheet)
       const denom = goal.target - start
       const progress = denom > 0 ? clamp01((equity - start) / denom) : equity >= goal.target ? 1 : 0
-      const remaining = goal.withinTurns - turn
+      const within = goal.withinTurns
       if (equity >= goal.target) {
         return { status: 'won', progress: 1, label: goal.label, detail: `純資産 ${yen(equity)} 到達` }
       }
-      if (turn >= goal.withinTurns) {
+      if (within !== undefined && turn >= within) {
         return { status: 'lost', progress, label: goal.label, detail: `期限切れ（純資産 ${yen(equity)}）` }
       }
+      const tail = within !== undefined ? `・残り${within - turn}ヶ月` : ''
       return {
         status: 'progress',
         progress,
         label: goal.label,
-        detail: `純資産 ${yen(equity)} / 目標 ${yen(goal.target)}・残り${remaining}期`,
+        detail: `純資産 ${yen(equity)} / 目標 ${yen(goal.target)}${tail}`,
       }
     }
     case 'repayAll': {
       const debt = interestBearingDebt(current)
       const startDebt = interestBearingDebt(initial)
       const progress = startDebt > 0 ? clamp01(1 - debt / startDebt) : 1
-      const remaining = goal.withinTurns - turn
+      const within = goal.withinTurns
       if (debt <= 0) {
         return { status: 'won', progress: 1, label: goal.label, detail: '有利子負債を完済' }
       }
-      if (turn >= goal.withinTurns) {
+      if (within !== undefined && turn >= within) {
         return { status: 'lost', progress, label: goal.label, detail: `期限切れ（残債 ${yen(debt)}）` }
       }
+      const tail = within !== undefined ? `・残り${within - turn}ヶ月` : ''
       return {
         status: 'progress',
         progress,
         label: goal.label,
-        detail: `残債 ${yen(debt)}・残り${remaining}期`,
+        detail: `残債 ${yen(debt)}${tail}`,
       }
     }
     case 'survive': {

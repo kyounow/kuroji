@@ -25,7 +25,7 @@ export const startupScenario: Scenario = {
     },
   },
   params: {
-    periodsPerYear: 4,
+    periodsPerYear: 12,
     baseDemand: 500,
     basePrice: 5_000,
     priceElasticity: 0.8,
@@ -47,11 +47,11 @@ export const startupScenario: Scenario = {
     interestRate: 0.05,
     effectiveTaxRate: 0.3,
   },
-  turnLimit: 32,
+  turnLimit: 96,
   goal: {
     kind: 'equityTarget',
-    label: '8年（32四半期）以内に純資産を 1,500万円に',
+    label: '8年（96ヶ月）以内に純資産を 1,500万円に',
     target: 15_000_000,
-    withinTurns: 32,
+    withinTurns: 96,
   },
 }

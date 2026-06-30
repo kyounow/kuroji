@@ -41,7 +41,7 @@ export const defaultScenario: Scenario = {
     },
   },
   params: {
-    periodsPerYear: 4, // 四半期ターン
+    periodsPerYear: 12, // 月次ターン
     // 需要（年額）
     baseDemand: 1_000,
     basePrice: 2_000,
@@ -70,11 +70,11 @@ export const defaultScenario: Scenario = {
     interestRate: 0.03,
     effectiveTaxRate: 0.3,
   },
-  turnLimit: 32, // 8年（32四半期）
+  turnLimit: 96, // 8年（96ヶ月）
   goal: {
     kind: 'equityTarget',
-    label: '8年（32四半期）以内に純資産を 1,000万円に',
+    label: '8年（96ヶ月）以内に純資産を 1,000万円に',
     target: 10_000_000,
-    withinTurns: 32,
+    withinTurns: 96,
   },
 }

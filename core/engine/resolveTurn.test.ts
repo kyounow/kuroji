@@ -88,8 +88,8 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
 
   it('販売は製品在庫が上限', () => {
     const { initialState, params } = getScenario('default')
-    // 期首製品 500個、生産なし、低価格で需要を在庫超に（四半期需要>500）→ 500 までしか売れない
-    const { unitsSold } = resolveTurn(initialState, decide({ unitPrice: 1_000, produceUnits: 0 }), params)
+    // 期首製品 500個、生産なし、十分な低価格で需要を在庫超に → 500 までしか売れない
+    const { unitsSold } = resolveTurn(initialState, decide({ unitPrice: 300, produceUnits: 0 }), params)
     expect(unitsSold).toBe(500)
   })
 

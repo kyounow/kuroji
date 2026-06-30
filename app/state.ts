@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer } from 'react'
+import { useCallback, useEffect, useMemo, useReducer } from 'react'
 import {
   resolveTurn,
   drawEvent,
@@ -16,16 +16,27 @@ import {
   type Ratios,
   type MarketEvent,
   type GoalStatus,
+  type Goal,
 } from '@core/index'
 import { getScenario, AVAILABLE_SCENARIOS } from '@data/scenarios'
 import { getEventTable } from '@data/events'
+import { saveGame, loadGame } from './storage'
 
 const DEFAULT_SEED = 12345
 const DEFAULT_SCENARIO = 'default'
+/** 横軸の安全弁（~100年＝1200ヶ月）。 */
+const MAX_TURNS = 1200
+
+/** ゲームモード。endless=期限なし(負けは倒産のみ・目標はマイルストーン)、challenge=期限付き目標で勝敗。 */
+export type GameMode = 'endless' | 'challenge'
+export const GAME_MODES: { id: GameMode; name: string }[] = [
+  { id: 'challenge', name: 'チャレンジ（期限付き目標）' },
+  { id: 'endless', name: 'エンドレス（じっくり経営）' },
+]
 
 /** 1ターンの記録（履歴・グラフ用）。 */
 export interface TurnRecord {
-  /** 何期目か（1 始まり） */
+  /** 何ヶ月目か（1 始まり） */
   turn: number
   event: MarketEvent
   decision: Decision
@@ -42,25 +53,47 @@ export type Outcome = 'playing' | 'won' | 'lost'
 
 export interface GameState {
   scenarioId: string
+  mode: GameMode
   seed: number
   current: CompanyState
   history: TurnRecord[]
   outcome: Outcome
   /** ゴール（勝利条件）の状況。フリープレイなら null。 */
   goalStatus: GoalStatus | null
+  /** エンドレスで目標を達成済みか（マイルストーン。ゲームは継続）。 */
+  goalAchieved: boolean
 }
 
-function makeInitial(scenarioId: string, seed: number): GameState {
+/** endless では期限（withinTurns）を外し、目標を「マイルストーン」として扱う。 */
+function stripDeadline(goal: Goal): Goal {
+  if (goal.kind === 'equityTarget' || goal.kind === 'repayAll') {
+    return { ...goal, withinTurns: undefined }
+  }
+  return goal
+}
+
+function evalGoal(
+  scenarioId: string,
+  current: CompanyState,
+  mode: GameMode,
+): GoalStatus | null {
+  const scenario = getScenario(scenarioId)
+  if (!scenario.goal) return null
+  const goal = mode === 'endless' ? stripDeadline(scenario.goal) : scenario.goal
+  return evaluateGoal(goal, current, scenario.initialState)
+}
+
+function makeInitial(scenarioId: string, seed: number, mode: GameMode): GameState {
   const scenario = getScenario(scenarioId)
   return {
     scenarioId,
+    mode,
     seed,
     current: scenario.initialState,
     history: [],
     outcome: 'playing',
-    goalStatus: scenario.goal
-      ? evaluateGoal(scenario.goal, scenario.initialState, scenario.initialState)
-      : null,
+    goalStatus: evalGoal(scenarioId, scenario.initialState, mode),
+    goalAchieved: false,
   }
 }
 
@@ -68,6 +101,7 @@ type Action =
   | { type: 'play'; decision: Decision }
   | { type: 'reset' }
   | { type: 'select'; scenarioId: string }
+  | { type: 'setMode'; mode: GameMode }
 
 /** 倒産判定: 現金がマイナス、または債務超過（純資産マイナス）。 */
 function isBankrupt(state: CompanyState): boolean {
@@ -77,9 +111,11 @@ function isBankrupt(state: CompanyState): boolean {
 function reducer(game: GameState, action: Action): GameState {
   switch (action.type) {
     case 'select':
-      return makeInitial(action.scenarioId, game.seed)
+      return makeInitial(action.scenarioId, game.seed, game.mode)
+    case 'setMode':
+      return makeInitial(game.scenarioId, game.seed, action.mode)
     case 'reset':
-      return makeInitial(game.scenarioId, game.seed)
+      return makeInitial(game.scenarioId, game.seed, game.mode)
     case 'play': {
       if (game.outcome !== 'playing') return game
       const scenario = getScenario(game.scenarioId)
@@ -120,36 +156,51 @@ function reducer(game: GameState, action: Action): GameState {
       }
 
       const bankrupt = isBankrupt(result.state)
-      let goalStatus: GoalStatus | null = scenario.goal
-        ? evaluateGoal(scenario.goal, result.state, scenario.initialState)
-        : null
+      let goalStatus = evalGoal(game.scenarioId, result.state, game.mode)
+      let goalAchieved = game.goalAchieved
 
       let outcome: Outcome = 'playing'
       if (bankrupt) {
         outcome = 'lost'
         if (goalStatus) goalStatus = { ...goalStatus, status: 'lost', detail: '倒産' }
-      } else if (goalStatus) {
-        outcome = goalStatus.status === 'progress' ? 'playing' : goalStatus.status
-      } else if (scenario.turnLimit && result.state.turn >= scenario.turnLimit) {
-        // フリープレイ: 固定期数に到達したら完走（won）扱い
-        outcome = 'won'
+      } else if (game.mode === 'challenge') {
+        // チャレンジ: 目標達成/期限切れでゲーム終了。
+        if (goalStatus) outcome = goalStatus.status === 'progress' ? 'playing' : goalStatus.status
+        else if (scenario.turnLimit && result.state.turn >= scenario.turnLimit) outcome = 'won'
+      } else {
+        // エンドレス: 目標達成はマイルストーン（継続）。期限切れは無し（deadline 除去済み）。
+        if (goalStatus && goalStatus.status === 'won') goalAchieved = true
+        if (result.state.turn >= MAX_TURNS) outcome = 'won' // 100年完走
       }
 
       return {
         ...game,
         current: result.state,
-        history: [...game.history, record],
+        history: [...game.history, record].slice(-MAX_TURNS),
         outcome,
         goalStatus,
+        goalAchieved,
       }
     }
   }
 }
 
+/** 起動時: 保存済みゲームがあれば復元、なければ新規。 */
+function initGame(): GameState {
+  const saved = loadGame() as GameState | null
+  if (saved && saved.scenarioId && saved.current && Array.isArray(saved.history)) {
+    return saved
+  }
+  return makeInitial(DEFAULT_SCENARIO, DEFAULT_SEED, 'challenge')
+}
+
 export function useGame() {
-  const [game, dispatch] = useReducer(reducer, undefined, () =>
-    makeInitial(DEFAULT_SCENARIO, DEFAULT_SEED),
-  )
+  const [game, dispatch] = useReducer(reducer, undefined, initGame)
+
+  // 変化のたびに自動保存（続きから再開できる）。
+  useEffect(() => {
+    saveGame(game)
+  }, [game])
 
   const play = useCallback((decision: Decision) => dispatch({ type: 'play', decision }), [])
   const reset = useCallback(() => dispatch({ type: 'reset' }), [])
@@ -157,6 +208,7 @@ export function useGame() {
     (scenarioId: string) => dispatch({ type: 'select', scenarioId }),
     [],
   )
+  const setMode = useCallback((mode: GameMode) => dispatch({ type: 'setMode', mode }), [])
 
   const scenario = getScenario(game.scenarioId)
   const eventTable = getEventTable(scenario.eventTableId)
@@ -167,5 +219,15 @@ export function useGame() {
     [eventTable, game.seed, game.current.turn],
   )
 
-  return { game, scenario, play, reset, selectScenario, scenarios: AVAILABLE_SCENARIOS, upcomingEvent }
+  return {
+    game,
+    scenario,
+    play,
+    reset,
+    selectScenario,
+    setMode,
+    scenarios: AVAILABLE_SCENARIOS,
+    modes: GAME_MODES,
+    upcomingEvent,
+  }
 }

@@ -13,7 +13,8 @@ import { loadBest, saveBest } from './storage'
 import { yen, yenSigned, pct, num } from './format'
 
 export function App() {
-  const { game, scenario, play, reset, selectScenario, scenarios, upcomingEvent } = useGame()
+  const { game, scenario, play, reset, selectScenario, setMode, scenarios, modes, upcomingEvent } =
+    useGame()
   const gameOver = game.outcome !== 'playing'
 
   const [decision, setDecision] = useState<Decision>({
@@ -118,11 +119,13 @@ export function App() {
         <div>
           <span className="status-num">{periodHeading}</span>
           <span className="muted">の経営判断</span>
-          {scenario.turnLimit && (
+          {game.mode === 'challenge' && scenario.turnLimit ? (
             <span className="muted small">
               （全{scenario.turnLimit}{unitName}・約{Math.round(scenario.turnLimit / ppy)}年）
             </span>
-          )}
+          ) : game.mode === 'endless' ? (
+            <span className="muted small">（エンドレス・最大100年）</span>
+          ) : null}
         </div>
         <div>
           <span className="muted">純資産</span> <span className="status-num">{yen(equity)}</span>{' '}
@@ -148,7 +151,23 @@ export function App() {
             ))}
           </select>
         </label>
+        <label className="scenario-select">
+          <span className="muted small">モード</span>
+          <select value={game.mode} onChange={(e) => setMode(e.target.value as typeof game.mode)}>
+            {modes.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
+
+      {game.mode === 'endless' && game.goalAchieved && !gameOver && (
+        <div className="gameover won">
+          <strong>🏆 マイルストーン達成！</strong> {game.goalStatus?.label}。このまま経営を続けられます。
+        </div>
+      )}
 
       {game.goalStatus && (
         <section className={`goal ${game.goalStatus.status}`}>

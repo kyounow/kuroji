@@ -7,10 +7,20 @@ interface Props {
   history: TurnRecord[]
 }
 
+/** 一定間隔で間引いて最大 max 点にする（先頭と末尾は必ず残す）。 */
+function downsample<T>(arr: T[], max: number): T[] {
+  if (arr.length <= max) return arr
+  const step = (arr.length - 1) / (max - 1)
+  const out: T[] = []
+  for (let i = 0; i < max; i++) out.push(arr[Math.round(i * step)])
+  return out
+}
+
 /** 純資産と現金の推移を描く簡易折れ線グラフ（依存ライブラリなしの SVG）。 */
 export function HistoryChart({ initial, history }: Props) {
-  // 期0（期首）＋各期末の系列。
-  const states = [initial, ...history.map((h) => h.stateAfter)]
+  // 期0（期首）＋各期末の系列。長期は ≤120 点に間引く。
+  const allStates = [initial, ...history.map((h) => h.stateAfter)]
+  const states = downsample(allStates, 120)
   const equity = states.map((s) => totalEquity(s.balanceSheet))
   const cash = states.map((s) => s.balanceSheet.currentAssets.cash)
 

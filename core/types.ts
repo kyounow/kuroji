@@ -236,8 +236,8 @@ export interface SimParams {
  * - survive: turns 期を倒産せず生き延びる
  */
 export type Goal =
-  | { kind: 'equityTarget'; label: string; target: number; withinTurns: number }
-  | { kind: 'repayAll'; label: string; withinTurns: number }
+  | { kind: 'equityTarget'; label: string; target: number; withinTurns?: number }
+  | { kind: 'repayAll'; label: string; withinTurns?: number }
   | { kind: 'survive'; label: string; turns: number }
 
 /** ゴールの達成状況。 */

@@ -19,10 +19,16 @@ export function HistoryTable({ history, selectedTurn, onSelect }: Props) {
     )
   }
 
+  const MAX_ROWS = 60
+  const shown = history.length > MAX_ROWS ? history.slice(-MAX_ROWS) : history
+
   return (
     <section className="panel">
       <h2>各期の履歴</h2>
-      <p className="muted small">行をクリックすると、その期の財務三表・指標を下に表示します。</p>
+      <p className="muted small">
+        行をクリックすると、その期の財務三表・指標を下に表示します。
+        {history.length > MAX_ROWS && `（直近${MAX_ROWS}ヶ月を表示）`}
+      </p>
       <div className="table-scroll">
         <table className="history">
           <thead>
@@ -38,7 +44,7 @@ export function HistoryTable({ history, selectedTurn, onSelect }: Props) {
             </tr>
           </thead>
           <tbody>
-            {history.map((rec) => {
+            {shown.map((rec) => {
               const equity = totalEquity(rec.stateAfter.balanceSheet)
               const cash = rec.stateAfter.balanceSheet.currentAssets.cash
               return (
