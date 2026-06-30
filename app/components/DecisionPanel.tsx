@@ -79,7 +79,7 @@ const FIELDS: readonly FieldDef[] = [
   { key: 'purchaseMaterials', label: '原材料の仕入数量', step: 50, hint: '' }, // hint は動的
   { key: 'produceUnits', label: '生産数量', step: 50, hint: '手持ち原材料が上限' },
   { key: 'marketingSpend', label: '販促費', step: 50_000, hint: '需要を押し上げる（逓減）' },
-  { key: 'rdSpend', label: '研究開発費（R&D）', step: 50_000, hint: '累積で原価↓・需要↑（翌期以降）' },
+  { key: 'rdSpend', label: '研究開発費（R&D）', step: 50_000, hint: '累積で原価↓・需要↑・リコール率↓（翌期以降）' },
   { key: 'insuranceSpend', label: '保険料', step: 50_000, hint: '突発ショックの損失をヘッジ' },
   { key: 'maintenanceSpend', label: '保全・点検費', step: 10_000, hint: '' }, // hint は動的
   { key: 'capitalExpenditure', label: '設備投資', step: 100_000, hint: '固定資産↑・現金↓' },
@@ -133,7 +133,7 @@ export function DecisionPanel({
     if (f.key === 'insuranceSpend')
       return `補償率 ${pct(insuranceCoverage)}（満額 ${yen(fullPremium)} で最大 ${pct(maxInsuranceCoverage)}。ショック損失をこの率だけ肩代わり）`
     if (f.key === 'maintenanceSpend')
-      return `設備故障の被害 −${pct(maintenanceReduction)}（満額 ${yen(fullMaintenance)} で最大 −${pct(maxMaintRed)}。予防保全で故障を軽減）`
+      return `発生時の被害 −${pct(maintenanceReduction)}（満額 ${yen(fullMaintenance)} で最大 −${pct(maxMaintRed)}）。継続で整備状態↑→故障の発生率↓`
     if (f.key === 'capitalExpenditure') return `${equipmentLabel}↑→${capacityLabel}↑・製造原価↓`
     if (f.key === 'financing') return `格付${creditGrade}・借入上限 ${yen(borrowLimit)}・金利 ${pct(effectiveRate)}`
     return f.hint

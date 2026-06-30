@@ -127,11 +127,14 @@ function isBankrupt(state: CompanyState): boolean {
   return state.balanceSheet.currentAssets.cash < 0 || totalEquity(state.balanceSheet) < 0
 }
 
-/** この判断・現在状態でのターン解決オプション（イベント・市況・競合・マクロ）を組み立てる。 */
-function turnOptionsFor(game: GameState, decision: Decision): TurnOptions {
+/**
+ * この判断・現在状態でのターン解決オプション（イベント・市況・競合・マクロ）を組み立てる。
+ * eventOverride を渡すと抽選イベントの代わりにそれを使う（確定時の発火判定後の実効イベント注入用）。
+ */
+function turnOptionsFor(game: GameState, decision: Decision, eventOverride?: MarketEvent): TurnOptions {
   const scenario = getScenario(game.scenarioId)
   const eventTable = getEventTable(scenario.eventTableId)
-  const event = drawEvent(eventTable, game.seed, game.current.turn)
+  const event = eventOverride ?? drawEvent(eventTable, game.seed, game.current.turn)
   const nextMaterialIndex = materialIndexNext(
     game.current.materialIndex,
     scenario.params,
@@ -181,6 +184,58 @@ function lossSeverityFor(game: GameState): number {
   return lo + (hi - lo) * hashUnit(game.seed ^ 0x5e7a17, game.current.turn)
 }
 
+const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
+
+/** 設備故障が「引かれた」期の発火率（整備状態 condition が高いほど低い）。未設定で 1＝常に発火。 */
+function breakdownFireRate(game: GameState): number {
+  const p = getScenario(game.scenarioId).params
+  if (p.breakdownBaseRate == null) return 1
+  const condition = game.current.condition ?? 1
+  return clamp01(p.breakdownBaseRate * (1 - (p.conditionShield ?? 0) * condition))
+}
+
+/** リコールが「引かれた」期の発火率（製品品質が高いほど低い）。未設定で 1＝常に発火。 */
+function recallFireRate(game: GameState): number {
+  const p = getScenario(game.scenarioId).params
+  if (p.recallBaseRate == null) return 1
+  const quality = productFromRd(game.current.rdStock, p).demandModifier
+  const qExcess = p.rdDemandBoostMax > 0 ? clamp01((quality - 1) / p.rdDemandBoostMax) : 0
+  return clamp01(p.recallBaseRate * (1 - (p.recallQualityShield ?? 0) * qExcess))
+}
+
+/** 確定時の隠れ発火ロール（発生率しだいで発火/回避）。非ショックは常に発火（影響そのまま）。 */
+function shockFired(game: GameState, event: MarketEvent): boolean {
+  if (event.id === 'breakdown')
+    return hashUnit(game.seed ^ 0xb1d00d, game.current.turn) < breakdownFireRate(game)
+  if (event.id === 'recall')
+    return hashUnit(game.seed ^ 0x4eca11, game.current.turn) < recallFireRate(game)
+  return true
+}
+
+/** 回避された（発火しなかった）ショックの実効イベント＝影響なしの平常扱い（履歴ラベルは「回避」）。 */
+function avertedEvent(event: MarketEvent): MarketEvent {
+  return {
+    id: event.id,
+    label: `${event.label}（回避）`,
+    description: `${event.description.replace(/。$/, '')}が、保全・品質により回避できた。`,
+    demandMultiplier: 1,
+  }
+}
+
+/**
+ * 次の期のショックリスク（UI 表示用）。breakdown/品質連動の recall のとき発生確率%を返す。
+ * リスク機構が無効（base rate 未設定）なら null（＝確定告知の従来挙動）。
+ */
+export function shockRiskFor(game: GameState): { kind: 'breakdown' | 'recall'; ratePct: number } | null {
+  const scenario = getScenario(game.scenarioId)
+  const event = drawEvent(getEventTable(scenario.eventTableId), game.seed, game.current.turn)
+  if (event.id === 'breakdown' && scenario.params.breakdownBaseRate != null)
+    return { kind: 'breakdown', ratePct: Math.round(breakdownFireRate(game) * 100) }
+  if (event.id === 'recall' && scenario.params.recallBaseRate != null)
+    return { kind: 'recall', ratePct: Math.round(recallFireRate(game) * 100) }
+  return null
+}
+
 function reducer(game: GameState, action: Action): GameState {
   switch (action.type) {
     case 'select':
@@ -195,9 +250,11 @@ function reducer(game: GameState, action: Action): GameState {
       if (game.outcome !== 'playing') return game
       const scenario = getScenario(game.scenarioId)
       const eventTable = getEventTable(scenario.eventTableId)
-      const event = drawEvent(eventTable, game.seed, game.current.turn)
+      const drawn = drawEvent(eventTable, game.seed, game.current.turn)
+      // ショックの発火判定（保全/品質で発生率↓）。回避なら影響なしの実効イベントに差し替え。
+      const event = shockFired(game, drawn) ? drawn : avertedEvent(drawn)
       const result = resolveTurn(game.current, action.decision, scenario.params, {
-        ...turnOptionsFor(game, action.decision),
+        ...turnOptionsFor(game, action.decision, event),
         demandNoise: demandNoiseFor(game), // 確定時のみ需要ブレを適用（プレビューには出さない）
         lossSeverity: lossSeverityFor(game), // 確定時のみショック毀損度を適用（プレビューは中心値）
       })

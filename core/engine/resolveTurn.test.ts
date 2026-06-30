@@ -421,6 +421,31 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(huge.shockEquipmentWritedown).toBe(Math.round(none.shockEquipmentWritedown * 0.3))
   })
 
+  it('整備状態 condition は保全費で上がり放置で下がる（clamp01・恒等式不変）', () => {
+    const params: SimParams = {
+      ...BASE_PARAMS,
+      maintenanceRefCost: 30_000,
+      conditionDecay: 0.03,
+      conditionGainPerRefCost: 0.1,
+    }
+    const start: CompanyState = { ...BASE_STATE, condition: 0.5 }
+    // 保全費 30,000 → gain 0.1、decay 0.03 → +0.07
+    const up = resolveTurn(start, decide({ maintenanceSpend: 30_000 }), params)
+    expect(up.state.condition).toBeCloseTo(0.57)
+    // 保全費0 → decay のみ
+    const down = resolveTurn(start, decide({ maintenanceSpend: 0 }), params)
+    expect(down.state.condition).toBeCloseTo(0.47)
+    // clamp 上限（1 を超えない）
+    const high = resolveTurn({ ...BASE_STATE, condition: 0.98 }, decide({ maintenanceSpend: 60_000 }), params)
+    expect(high.state.condition).toBe(1)
+    expect(balances(up.state.balanceSheet)).toBe(true)
+  })
+
+  it('conditionDecay 未設定なら condition は据置（後方互換）', () => {
+    const r = resolveTurn({ ...BASE_STATE, condition: 0.4 }, decide({}), BASE_PARAMS)
+    expect(r.state.condition).toBe(0.4)
+  })
+
   it('後方互換: 比率未指定なら floor(絶対額)がそのまま損失になる', () => {
     const { initialState, params } = base()
     const r = resolveTurn(initialState, decide({ produceUnits: 0 }), params, {

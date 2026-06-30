@@ -12,6 +12,9 @@ import { productFromRd } from '@core/product/research'
 import { assessCredit } from '@core/finance/credit'
 import { productionCapacity, costEfficiency } from '@core/finance/capacity'
 
+/** 0..1 にクランプ。 */
+const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
+
 /** 販促費から需要乗数を求める（逓減効果、上限あり）。 */
 export function marketingMultiplier(spend: number, params: SimParams): number {
   if (spend <= 0) return 1
@@ -223,6 +226,20 @@ export function resolveTurn(
     cashEnd,
   }
 
+  // 設備の整備状態（保全費の累積で上がり、放置で逓減）。次ターンの故障発生率を左右する。
+  // B/S 外のメタ変数（資産計上しない）なので恒等式に無干渉。
+  const conditionNext =
+    params.conditionDecay != null
+      ? clamp01(
+          (state.condition ?? 1) -
+            params.conditionDecay +
+            (params.conditionGainPerRefCost ?? 0) *
+              (params.maintenanceRefCost && params.maintenanceRefCost > 0
+                ? maintenanceSpend / params.maintenanceRefCost
+                : 0),
+        )
+      : (state.condition ?? 1)
+
   // --- 期末の貸借対照表（B/S）と状態 ---
   const nextState: CompanyState = {
     turn: state.turn + 1,
@@ -230,6 +247,7 @@ export function resolveTurn(
     finishedUnits: finUnitsEnd,
     materialIndex: options.nextMaterialIndex ?? state.materialIndex,
     rdStock: state.rdStock + rdSpend,
+    condition: conditionNext,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,

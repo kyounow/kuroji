@@ -61,7 +61,7 @@ export const defaultEvents: EventTable = [
     },
   },
   {
-    weight: 0.4,
+    weight: 0.2,
     event: {
       id: 'recall',
       label: 'リコール',

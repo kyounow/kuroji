@@ -10,7 +10,7 @@ import {
   productionCapacity,
   costEfficiency,
 } from '@core/index'
-import { useGame, previewTurn } from './state'
+import { useGame, previewTurn, shockRiskFor } from './state'
 import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
 import { StatementsView } from './components/StatementsView'
@@ -139,6 +139,9 @@ export function App() {
   // 今期の確定前プレビュー（この判断の見込み結果。原価率・損益分岐の算出に使う）。
   const preview = useMemo(() => previewTurn(game, decision), [game, decision])
 
+  // 次の期のショック発生確率リスク（保全水準/品質で低下）。
+  const shockRisk = useMemo(() => shockRiskFor(game), [game])
+
   return (
     <main className="app">
       <header className="topbar">
@@ -237,6 +240,7 @@ export function App() {
         insuranceCoverage={preview.insuranceCoverage}
         shockOneOffLoss={preview.shockOneOffLoss}
         shockEquipmentWritedown={preview.shockEquipmentWritedown}
+        shockRisk={shockRisk}
       />
 
       <MacroPanel macro={game.macro} effectiveRate={effectiveRate} />
@@ -276,6 +280,14 @@ export function App() {
             <div className="metric-value">{yen(game.current.rdStock)}</div>
             <div className="metric-label">累積R&D投資</div>
           </div>
+          {scenario.params.conditionDecay != null && (
+            <div className="metric">
+              <div className={`metric-value ${(game.current.condition ?? 1) >= 0.6 ? 'ok' : 'ng'}`}>
+                {pct(game.current.condition ?? 1)}
+              </div>
+              <div className="metric-label">設備の整備状態（保全費で維持・故障率に直結）</div>
+            </div>
+          )}
         </div>
         <p className="muted small">
           原材料を仕入れて在庫し、生産で製品へ。原材料価格は市況で変動（安い時に仕込むと有利）。

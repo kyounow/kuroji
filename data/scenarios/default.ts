@@ -54,6 +54,13 @@ export const defaultScenario: Scenario = {
     maxInsuranceCoverage: 0.8,
     maintenanceRefCost: 30_000, // この保全費で最大軽減に到達
     maxMaintenanceReduction: 0.7, // 予防保全で設備故障の被害を最大70%軽減
+    // 故障・リコールは「発生確率リスク」。積み上げた整備状態・品質で発火率が下がる。
+    conditionDecay: 0.03, // 整備状態は毎月3%劣化
+    conditionGainPerRefCost: 0.1, // 保全費30,000で整備状態+0.1（半額で劣化と均衡）
+    conditionShield: 0.85, // 整備状態満点で故障発火率を最大85%減
+    breakdownBaseRate: 1.0, // 放置（整備状態0）なら引かれた故障は必ず発火
+    recallBaseRate: 0.8, // 品質0でも引かれたリコールの80%が発火
+    recallQualityShield: 0.8, // 品質満点でリコール発火率を最大80%減
     // 研究開発
     rdCostReductionMax: 0.4,
     rdDemandBoostMax: 0.5,

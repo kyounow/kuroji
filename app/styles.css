@@ -119,6 +119,16 @@ h2 {
 .event-label {
   font-weight: 700;
 }
+.risk-badge {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent);
+}
 .event-desc {
   color: var(--muted);
 }

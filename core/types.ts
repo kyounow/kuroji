@@ -59,6 +59,8 @@ export interface CompanyState {
   materialIndex: number
   /** 累積の研究開発投資。製品パラメータ（製造原価・需要）を規定する。 */
   rdStock: number
+  /** 設備の整備状態（0..1、1=新品同様）。保全費の累積で上がり、放置で逓減。高いほど故障の発生率が下がる。未設定は 1。 */
+  condition?: number
 }
 
 /** 研究開発の成果として変化する製品パラメータ。 */
@@ -274,6 +276,20 @@ export interface SimParams {
   maintenanceRefCost?: number
   /** 保全による設備故障の被害の最大削減率（0..1。例 0.7 = 故障被害を最大70%軽減） */
   maxMaintenanceReduction?: number
+
+  // --- 突発ショックの発生率（積み上げた水準で下げられる確率リスク） ---
+  /** 整備状態の毎期の自然劣化（例 0.03/月）。未設定で condition 機構無効（＝従来どおり常に発火）。 */
+  conditionDecay?: number
+  /** 保全費が maintenanceRefCost のとき得られる整備状態の上昇（例 0.1）。 */
+  conditionGainPerRefCost?: number
+  /** 整備状態が満点(1)のときの設備故障発生率の削減（0..1。例 0.85 = 故障発火率を最大85%減）。 */
+  conditionShield?: number
+  /** 設備故障が「引かれた」ときの基準発火率（整備状態0で適用。例 1.0 = 放置なら必ず発火）。 */
+  breakdownBaseRate?: number
+  /** リコールが「引かれた」ときの基準発火率（品質0で適用。例 0.8）。未設定で常に発火（従来）。 */
+  recallBaseRate?: number
+  /** 製品品質（R&D由来）が満点のときのリコール発火率の削減（0..1。例 0.8）。 */
+  recallQualityShield?: number
 
   // --- 研究開発（製品パラメータ） ---
   /** 累積R&Dによる製造原価の最大削減率（例 0.4 = 最大−40%） */

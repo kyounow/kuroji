@@ -7,6 +7,7 @@ export function EventBanner({
   insuranceCoverage = 0,
   shockOneOffLoss,
   shockEquipmentWritedown,
+  shockRisk,
 }: {
   event: MarketEvent
   /** 現在の保険料での補償率（0..1）。ショック時の自己負担表示に使う。 */
@@ -15,6 +16,8 @@ export function EventBanner({
   shockOneOffLoss?: number
   /** 当期の見込み設備毀損（preview 由来・規模連動）。未指定ならイベントの固定額にフォールバック。 */
   shockEquipmentWritedown?: number
+  /** ショックの発生確率リスク（保全/品質で低下）。null なら確定告知（従来）。 */
+  shockRisk?: { kind: 'breakdown' | 'recall'; ratePct: number } | null
 }) {
   const delta = event.demandMultiplier - 1
   // 規模連動の見込み額（preview）優先。無ければイベント定義の固定額にフォールバック（後方互換）。
@@ -37,13 +40,25 @@ export function EventBanner({
   const selfBurden = Math.round((1 - insuranceCoverage) * shockLoss)
   const covered = shockLoss - selfBurden
 
+  const riskLever = shockRisk?.kind === 'breakdown' ? '保全水準' : '製品品質'
+
   return (
     <div className={`event ${tone}`}>
-      <span className="event-label">今期の市況: {event.label}</span>
+      <span className="event-label">
+        今期の市況: {event.label}
+        {shockRisk && (
+          <span className="risk-badge">
+            発生確率 約{shockRisk.ratePct}%（{riskLever}で低下）
+          </span>
+        )}
+      </span>
       <span className="event-desc">
         {event.description}（{effects.join('・')}）
         {hasShock && (
           <>
+            {shockRisk && (
+              <span className="muted small"> ※発火した場合の見込み損失です。{riskLever}を高めると発生しにくくなります。</span>
+            )}
             {insuranceCoverage > 0 ? (
               <span className="muted small">
                 {' '}
