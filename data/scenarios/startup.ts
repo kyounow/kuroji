@@ -29,6 +29,7 @@ export const startupScenario: Scenario = {
     basePrice: 5_000,
     priceElasticity: 0.8,
     competitorStrength: 0.5,
+    demandNoise: 0.25, // 受注は読みにくい
     capacityPerEquipment: 0.0012, // サーバー20万 → 年間240 → 月次20
     scaleEconomyMax: 0.4, // 自動化で限界費用が下がる
     scaleEconomyHalf: 1_500_000,

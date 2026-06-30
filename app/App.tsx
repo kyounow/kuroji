@@ -314,7 +314,13 @@ export function App() {
         equipmentLabel={equipmentLabel}
       />
 
-      {!gameOver && <ForecastPanel preview={preview} decision={decision} />}
+      {!gameOver && (
+        <ForecastPanel
+          preview={preview}
+          decision={decision}
+          demandNoise={scenario.params.demandNoise ?? 0}
+        />
+      )}
 
       <HistoryTable
         history={game.history}

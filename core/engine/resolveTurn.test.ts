@@ -337,6 +337,18 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(balances(resolveTurn(initialState, decide(), params, { policyRate: 0.03 }).state.balanceSheet)).toBe(true)
   })
 
+  it('需要ブレ(demandNoise)は需要に作用し、未指定なら中心値（恒等式は維持）', () => {
+    const { initialState, params } = base()
+    const setup = decide({ purchaseMaterials: 2_000, produceUnits: 2_000 })
+    const central = resolveTurn(initialState, setup, params).demand
+    const high = resolveTurn(initialState, setup, params, { demandNoise: 1.2 }).demand
+    const low = resolveTurn(initialState, setup, params, { demandNoise: 0.8 }).demand
+    expect(high).toBeGreaterThan(central)
+    expect(low).toBeLessThan(central)
+    expect(resolveTurn(initialState, setup, params).demand).toBe(central) // 未指定=中心値
+    expect(balances(resolveTurn(initialState, setup, params, { demandNoise: 1.2 }).state.balanceSheet)).toBe(true)
+  })
+
   it('景気の需要倍率が需要に作用する', () => {
     const { initialState, params } = base()
     const setup = decide({ purchaseMaterials: 1_000, produceUnits: 1_000 })

@@ -93,6 +93,8 @@ export function resolveTurn(
   // --- ③ 需要と販売（製品在庫から） ---
   const demandMultiplier = options.demandMultiplier ?? 1
   const shareMultiplier = options.demandShareMultiplier ?? 1
+  // 需要ブレ（確定時のみ。プレビューは未指定＝1で中心値）。実際の販売に不確実性を持たせる。
+  const demandNoise = options.demandNoise ?? 1
   // 物価上昇時に名目価格を据え置くと実質値下げ→需要増（unitPrice を物価で割る）。
   const rawDemand = demandAt(decision.unitPrice / inflationIndex, params)
   const demand = Math.max(
@@ -104,10 +106,12 @@ export function resolveTurn(
         macroDemandMultiplier *
         product.demandModifier *
         shareMultiplier *
-        periodFactor,
+        periodFactor *
+        demandNoise,
     ),
   )
-  const unitsSold = Math.min(demand, finUnitsAfterProduce)
+  const availableToSell = finUnitsAfterProduce
+  const unitsSold = Math.min(demand, availableToSell)
   const revenue = Math.round(decision.unitPrice * unitsSold)
   const costOfGoodsSold = Math.round(unitsSold * finAvg)
   const finUnitsEnd = finUnitsAfterProduce - unitsSold
@@ -226,6 +230,8 @@ export function resolveTurn(
     incomeStatement,
     cashFlow,
     unitsSold,
+    demand,
+    availableToSell,
     effectiveUnitCost: spotCost,
     product,
     deltaAR,

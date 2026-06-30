@@ -5,20 +5,35 @@ import { yen, pct, num } from '../format'
 const intOr = (n: number, suffix = '') => (Number.isFinite(n) ? `${num(n)}${suffix}` : '—')
 
 /** 今期の確定前プレビュー＋原価率・損益分岐（利益維持ライン）の表示。 */
-export function ForecastPanel({ preview, decision }: { preview: TurnResult; decision: Decision }) {
+export function ForecastPanel({
+  preview,
+  decision,
+  demandNoise = 0,
+}: {
+  preview: TurnResult
+  decision: Decision
+  /** 実需のブレ幅 σ（見込み数量の幅表示に使う）。 */
+  demandNoise?: number
+}) {
   const pl = preview.incomeStatement
   const be = breakEven({ unitPrice: decision.unitPrice, unitsSold: preview.unitsSold, income: pl })
   const sold = preview.unitsSold
   const profit = pl.netIncome
   const aboveBE = Number.isFinite(be.breakEvenUnits) && sold >= be.breakEvenUnits
 
+  // 見込み販売数量の幅（実需 ±σ を在庫上限でクリップ）。
+  const lo = Math.max(0, Math.min(Math.round(preview.demand * (1 - demandNoise)), preview.availableToSell))
+  const hi = Math.max(0, Math.min(Math.round(preview.demand * (1 + demandNoise)), preview.availableToSell))
+  const hasRange = demandNoise > 0 && hi > lo
+  const soldLabel = hasRange ? `${num(lo)}〜${num(hi)}個` : `${num(sold)}個`
+
   return (
     <section className="panel forecast">
       <h2>今期の見込み（この判断のプレビュー）</h2>
       <div className="product-grid">
         <div className="metric">
-          <div className="metric-value">{num(sold)}個</div>
-          <div className="metric-label">見込み販売数量</div>
+          <div className="metric-value">{soldLabel}</div>
+          <div className="metric-label">見込み販売数量{hasRange ? `（中心 ${num(sold)}個）` : ''}</div>
         </div>
         <div className="metric">
           <div className="metric-value">{yen(pl.revenue)}</div>
@@ -54,8 +69,10 @@ export function ForecastPanel({ preview, decision }: { preview: TurnResult; deci
         <p className="muted small">
           <strong>利益維持ライン:</strong> 粗利 {yen(be.contributionPerUnit)}/個で固定費等{' '}
           {yen(be.fixedLike)}/月を賄うには <strong>月 {intOr(be.breakEvenUnits)}個</strong> 必要。
-          今の見込みは <span className={aboveBE ? 'ok' : 'ng'}>{num(sold)}個（{aboveBE ? '黒字' : '赤字'}）</span>。
-          この販売数量なら <strong>売価 {yen(be.breakEvenPrice)}</strong> 以上で黒字になります。
+          見込み販売は <span className={aboveBE ? 'ok' : 'ng'}>{soldLabel}（中心 {num(sold)}個）</span>。
+          中心がこのライン以上なら黒字寄り。この販売数量での損益分岐単価は{' '}
+          <strong>{yen(be.breakEvenPrice)}</strong>。
+          {hasRange && <>（実際の需要は±{Math.round(demandNoise * 100)}%ほどブレるため、利益も上下します）</>}
         </p>
       )}
     </section>

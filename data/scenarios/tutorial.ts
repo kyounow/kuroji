@@ -29,6 +29,7 @@ export const tutorialScenario: Scenario = {
     basePrice: 1_000,
     priceElasticity: 1.2,
     competitorStrength: 0, // 競合なし
+    demandNoise: 0, // チュートリアルは需要ブレなし（見込み＝確定で学びやすく）
     // 生産能力の制約なし（capacityPerEquipment 未設定）。設備投資が未開放のため。
     unitVariableCost: 600,
     materialVolatility: 0.1,

@@ -122,6 +122,8 @@ export interface TurnOptions {
   inflationIndex?: number
   /** 当期の景気局面に由来する需要倍率（既定 1.0） */
   macroDemandMultiplier?: number
+  /** 当期の需要ブレ乗数（確定時のみ。プレビューは未指定＝1で中心値） */
+  demandNoise?: number
 }
 
 /**
@@ -153,6 +155,10 @@ export interface TurnResult {
   cashFlow: CashFlowStatement
   /** 販売数量 */
   unitsSold: number
+  /** 当期の潜在需要（各乗数反映後・在庫上限前）。プレビューの見込み幅に使う。 */
+  demand: number
+  /** 当期に販売可能だった製品数量（期首在庫＋当期生産） */
+  availableToSell: number
   /** 当期の原材料スポット単価（R&D・市況反映後の1個あたり仕入原価） */
   effectiveUnitCost: number
   /** 当期に適用された製品パラメータ */
@@ -191,6 +197,8 @@ export interface SimParams {
   priceElasticity: number
   /** 競合の強さ（0 = 競合なし。大きいほど競合が高品質で手強い） */
   competitorStrength: number
+  /** 実際の需要のブレ幅（0..。例 0.15 = ±15%）。プレビューには出さず、確定時に隠れた乱数で適用。 */
+  demandNoise?: number
 
   // --- 設備・生産能力（設備投資の効果） ---
   /** 設備1円あたりの年間生産能力（数量）。未設定/0 は能力無制限。 */

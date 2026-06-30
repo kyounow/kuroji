@@ -11,6 +11,7 @@ import {
   initialMacro,
   advanceMacro,
   cycleDemandMultiplier,
+  hashUnit,
   totalEquity,
   type MacroState,
   type CompanyState,
@@ -143,10 +144,17 @@ function turnOptionsFor(game: GameState, decision: Decision): TurnOptions {
   }
 }
 
-/** 確定前のゴースト計算（コミットせず、この判断の見込み結果を返す）。確定と同じ式なので必ず一致。 */
+/** 確定前のゴースト計算（コミットせず、この判断の見込み結果を返す）。需要ブレ無し＝中心値。 */
 export function previewTurn(game: GameState, decision: Decision): TurnResult {
   const scenario = getScenario(game.scenarioId)
   return resolveTurn(game.current, decision, scenario.params, turnOptionsFor(game, decision))
+}
+
+/** 確定時のみ適用する隠れた需要ブレ乗数（決定論だがプレビューには出さない）。 */
+function demandNoiseFor(game: GameState): number {
+  const sigma = getScenario(game.scenarioId).params.demandNoise ?? 0
+  if (sigma <= 0) return 1
+  return 1 + (hashUnit(game.seed ^ 0x2b3c4d, game.current.turn) * 2 - 1) * sigma
 }
 
 function reducer(game: GameState, action: Action): GameState {
@@ -162,12 +170,10 @@ function reducer(game: GameState, action: Action): GameState {
       const scenario = getScenario(game.scenarioId)
       const eventTable = getEventTable(scenario.eventTableId)
       const event = drawEvent(eventTable, game.seed, game.current.turn)
-      const result = resolveTurn(
-        game.current,
-        action.decision,
-        scenario.params,
-        turnOptionsFor(game, action.decision),
-      )
+      const result = resolveTurn(game.current, action.decision, scenario.params, {
+        ...turnOptionsFor(game, action.decision),
+        demandNoise: demandNoiseFor(game), // 確定時のみ需要ブレを適用（プレビューには出さない）
+      })
       const nextMacro = advanceMacro(game.macro, scenario.params, game.seed, game.current.turn)
       const record: TurnRecord = {
         turn: result.state.turn,
