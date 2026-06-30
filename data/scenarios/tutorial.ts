@@ -24,6 +24,7 @@ export const tutorialScenario: Scenario = {
     },
   },
   params: {
+    periodsPerYear: 4,
     baseDemand: 1_000,
     basePrice: 2_000,
     priceElasticity: 1.2,
@@ -46,10 +47,10 @@ export const tutorialScenario: Scenario = {
     effectiveTaxRate: 0.3,
   },
   enabledDecisions: ['unitPrice', 'purchaseMaterials', 'produceUnits'],
-  turnLimit: 6,
+  turnLimit: 8,
   goal: {
     kind: 'survive',
-    label: '6期を倒産せず経営する',
-    turns: 6,
+    label: '2年（8四半期）を倒産せず経営する',
+    turns: 8,
   },
 }

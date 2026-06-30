@@ -24,6 +24,7 @@ export const cafeScenario: Scenario = {
     },
   },
   params: {
+    periodsPerYear: 4,
     baseDemand: 2_000,
     basePrice: 600,
     priceElasticity: 1.5,
@@ -45,11 +46,11 @@ export const cafeScenario: Scenario = {
     interestRate: 0.03,
     effectiveTaxRate: 0.3,
   },
-  turnLimit: 12,
+  turnLimit: 32,
   goal: {
     kind: 'equityTarget',
-    label: '12期以内に純資産を 500万円に',
+    label: '8年（32四半期）以内に純資産を 500万円に',
     target: 5_000_000,
-    withinTurns: 12,
+    withinTurns: 32,
   },
 }

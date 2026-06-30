@@ -45,7 +45,8 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
 
   it('営業 CF = 純利益 + 減価償却 − ΔAR − Δ棚卸 + ΔAP（間接法の整合）', () => {
     const { initialState, params } = getScenario('default')
-    const dep = Math.round(initialState.balanceSheet.fixedAssets.equipment * params.depreciationRate)
+    const ppy = params.periodsPerYear ?? 1
+    const dep = Math.round((initialState.balanceSheet.fixedAssets.equipment * params.depreciationRate) / ppy)
     const r = resolveTurn(initialState, decide({ purchaseMaterials: 800, produceUnits: 500 }), params)
     expect(r.cashFlow.operating).toBe(
       r.incomeStatement.netIncome + dep - r.deltaAR - r.deltaInventory + r.deltaAP,
@@ -87,9 +88,20 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
 
   it('販売は製品在庫が上限', () => {
     const { initialState, params } = getScenario('default')
-    // 期首製品 500個、生産なし、需要は基準価格で1000 → 500 までしか売れない
-    const { unitsSold } = resolveTurn(initialState, decide({ produceUnits: 0 }), params)
+    // 期首製品 500個、生産なし、低価格で需要を在庫超に（四半期需要>500）→ 500 までしか売れない
+    const { unitsSold } = resolveTurn(initialState, decide({ unitPrice: 1_000, produceUnits: 0 }), params)
     expect(unitsSold).toBe(500)
+  })
+
+  it('periodsPerYear で流量（需要・固定費・減価償却・利息）がスケールする', () => {
+    const { initialState, params } = getScenario('default') // ppy=4
+    const annual = { ...params, periodsPerYear: 1 }
+    const dAnnual = resolveTurn(initialState, decide({ purchaseMaterials: 2_000, produceUnits: 2_000 }), annual)
+    const dQuarter = resolveTurn(initialState, decide({ purchaseMaterials: 2_000, produceUnits: 2_000 }), params)
+    // 四半期の販売数量・固定費は年次の約 1/4
+    expect(dQuarter.unitsSold).toBeLessThan(dAnnual.unitsSold)
+    expect(dQuarter.incomeStatement.operatingExpenses).toBeLessThan(dAnnual.incomeStatement.operatingExpenses)
+    expect(balances(dQuarter.state.balanceSheet)).toBe(true)
   })
 
   it('掛け売り比率に応じて売掛金、原材料仕入の掛けに応じて買掛金が立つ', () => {
@@ -233,7 +245,7 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
   it('設備毀損は設備簿価を減らし、恒等式を保つ', () => {
     const { initialState, params } = getScenario('default')
     const before = initialState.balanceSheet.fixedAssets.equipment
-    const dep = Math.round(before * params.depreciationRate)
+    const dep = Math.round((before * params.depreciationRate) / (params.periodsPerYear ?? 1))
     const r = resolveTurn(initialState, decide({ produceUnits: 0 }), params, { equipmentLoss: 1_000_000 })
     expect(r.state.balanceSheet.fixedAssets.equipment).toBe(before - dep - 1_000_000)
     expect(balances(r.state.balanceSheet)).toBe(true)

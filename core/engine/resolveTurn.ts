@@ -41,6 +41,9 @@ export function resolveTurn(
 ): TurnResult {
   const bs = state.balanceSheet
   const product = productFromRd(state.rdStock, params)
+  // 1ターンの長さ（年→期間）。流量はこの係数でスケールする。
+  const ppy = params.periodsPerYear ?? 1
+  const periodFactor = 1 / ppy
 
   // 当期の原材料スポット単価（市況 × R&D 原価改善）
   const spotCost = Math.max(
@@ -84,7 +87,8 @@ export function resolveTurn(
         marketingMultiplier(decision.marketingSpend, params) *
         demandMultiplier *
         product.demandModifier *
-        shareMultiplier,
+        shareMultiplier *
+        periodFactor,
     ),
   )
   const unitsSold = Math.min(demand, finUnitsAfterProduce)
@@ -95,18 +99,20 @@ export function resolveTurn(
 
   // --- 損益計算書（P/L） ---
   const grossProfit = revenue - costOfGoodsSold
-  const depreciation = Math.round(bs.fixedAssets.equipment * params.depreciationRate)
+  // 固定費・減価償却は年額を期間でスケール。
+  const fixedCosts = Math.round(params.fixedCosts * periodFactor)
+  const depreciation = Math.round(bs.fixedAssets.equipment * params.depreciationRate * periodFactor)
   const marketingSpend = Math.max(0, decision.marketingSpend)
   const rdSpend = Math.max(0, decision.rdSpend)
   const insuranceSpend = Math.max(0, decision.insuranceSpend)
-  const operatingExpenses = params.fixedCosts + depreciation + marketingSpend + rdSpend + insuranceSpend
+  const operatingExpenses = fixedCosts + depreciation + marketingSpend + rdSpend + insuranceSpend
   const operatingIncome = grossProfit - operatingExpenses
 
   // 信用力に応じて金利スプレッドが乗る（期首の財務状態で評価）。
   const credit = assessCredit(state)
   const effectiveInterestRate = params.interestRate + credit.spread
   const debt = bs.currentLiabilities.shortTermDebt + bs.nonCurrentLiabilities.longTermDebt
-  const interestExpense = Math.round(debt * effectiveInterestRate)
+  const interestExpense = Math.round(debt * effectiveInterestRate * periodFactor)
 
   // 突発ショック（保険で一部ヘッジ）。設備毀損は簿価から控除（非現金）。
   const oneOffLoss = Math.max(0, options.oneOffLoss ?? 0)

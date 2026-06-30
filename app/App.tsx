@@ -18,8 +18,8 @@ export function App() {
 
   const [decision, setDecision] = useState<Decision>({
     unitPrice: scenario.params.basePrice,
-    purchaseMaterials: scenario.params.baseDemand,
-    produceUnits: scenario.params.baseDemand,
+    purchaseMaterials: Math.round(scenario.params.baseDemand / (scenario.params.periodsPerYear ?? 1)),
+    produceUnits: Math.round(scenario.params.baseDemand / (scenario.params.periodsPerYear ?? 1)),
     marketingSpend: 0,
     rdSpend: 0,
     insuranceSpend: 0,
@@ -32,8 +32,8 @@ export function App() {
   useEffect(() => {
     setDecision({
       unitPrice: scenario.params.basePrice,
-      purchaseMaterials: scenario.params.baseDemand,
-      produceUnits: scenario.params.baseDemand,
+      purchaseMaterials: Math.round(scenario.params.baseDemand / (scenario.params.periodsPerYear ?? 1)),
+      produceUnits: Math.round(scenario.params.baseDemand / (scenario.params.periodsPerYear ?? 1)),
       marketingSpend: 0,
       rdSpend: 0,
       insuranceSpend: 0,
@@ -87,6 +87,18 @@ export function App() {
   const credit = assessCredit(game.current)
   const effectiveRate = scenario.params.interestRate + credit.spread
 
+  // ターンの呼称（四半期 / 月次 / 年次）。
+  const ppy = scenario.params.periodsPerYear ?? 1
+  const yearNo = Math.floor(game.current.turn / ppy) + 1
+  const subNo = (game.current.turn % ppy) + 1
+  const periodHeading =
+    ppy === 4
+      ? `${yearNo}年目 第${subNo}四半期`
+      : ppy === 12
+        ? `${yearNo}年目 ${subNo}ヶ月目`
+        : `第 ${game.current.turn + 1} 期`
+  const unitName = ppy === 4 ? '四半期' : ppy === 12 ? 'ヶ月' : '期'
+
   // 競合・市場シェア（現在の販売価格・自社品質でのライブ試算）。
   const hasCompetitor = scenario.params.competitorStrength > 0
   const competitor = competitorAt(scenario.params, game.seed, game.current.turn)
@@ -104,10 +116,12 @@ export function App() {
 
       <section className="status">
         <div>
-          <span className="status-num">第 {game.current.turn + 1} 期</span>
+          <span className="status-num">{periodHeading}</span>
           <span className="muted">の経営判断</span>
           {scenario.turnLimit && (
-            <span className="muted small">（全{scenario.turnLimit}期）</span>
+            <span className="muted small">
+              （全{scenario.turnLimit}{unitName}・約{Math.round(scenario.turnLimit / ppy)}年）
+            </span>
           )}
         </div>
         <div>

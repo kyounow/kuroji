@@ -170,8 +170,12 @@ export interface TurnResult {
  * ドメイン（core）が計算に使う入力で、具体値は data 側のシナリオが供給する。
  */
 export interface SimParams {
-  // --- 需要 ---
-  /** 基準需要（価格が basePrice のときの販売数量） */
+  // --- 期間 ---
+  /** 1年あたりのターン数（4=四半期、12=月次、1=年次）。流量（需要・固定費・償却・利息）を 1/この値 にスケールする。未指定は 1。 */
+  periodsPerYear?: number
+
+  // --- 需要（年額ベース。エンジンが期間に応じてスケール） ---
+  /** 基準需要（年額。価格が basePrice のときの年間販売数量） */
   baseDemand: number
   /** 基準価格 */
   basePrice: number
