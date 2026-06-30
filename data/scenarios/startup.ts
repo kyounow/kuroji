@@ -58,7 +58,7 @@ export const startupScenario: Scenario = {
   turnLimit: 96,
   goal: {
     kind: 'equityTarget',
-    label: '8年（96ヶ月）以内に純資産を 200万円に',
+    label: '純資産を 200万円にする',
     target: 2_000_000,
     withinTurns: 96,
   },

@@ -4,6 +4,22 @@ import { totalEquity } from '@core/statements/identity'
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 const yen = (n: number): string => `¥${Math.round(n).toLocaleString('ja-JP')}`
 
+/** 期限（ターン＝月次前提）を「N年（Mヶ月）」または「Mヶ月」で表す。 */
+function deadlineText(turns: number): string {
+  return turns % 12 === 0 ? `${turns / 12}年（${turns}ヶ月）` : `${turns}ヶ月`
+}
+
+/**
+ * モードに応じた目標ラベル。
+ * 期限あり（withinTurns）＝チャレンジ（達成で勝ち・期限切れで負け）、
+ * 期限なし＝エンドレス（マイルストーン。達成しても継続、時間切れでは負けない）。
+ */
+function modeLabel(base: string, within: number | undefined): string {
+  return within !== undefined
+    ? `${base}（チャレンジ: ${deadlineText(within)}以内に達成）`
+    : `${base}（エンドレス: 期限なしのマイルストーン）`
+}
+
 /** 有利子負債（短期＋長期借入）。 */
 function interestBearingDebt(state: CompanyState): number {
   return (
@@ -27,17 +43,18 @@ export function evaluateGoal(goal: Goal, current: CompanyState, initial: Company
       const denom = goal.target - start
       const progress = denom > 0 ? clamp01((equity - start) / denom) : equity >= goal.target ? 1 : 0
       const within = goal.withinTurns
+      const label = modeLabel(goal.label, within)
       if (equity >= goal.target) {
-        return { status: 'won', progress: 1, label: goal.label, detail: `純資産 ${yen(equity)} 到達` }
+        return { status: 'won', progress: 1, label, detail: `純資産 ${yen(equity)} 到達` }
       }
       if (within !== undefined && turn >= within) {
-        return { status: 'lost', progress, label: goal.label, detail: `期限切れ（純資産 ${yen(equity)}）` }
+        return { status: 'lost', progress, label, detail: `期限切れ（純資産 ${yen(equity)}）` }
       }
       const tail = within !== undefined ? `・残り${within - turn}ヶ月` : ''
       return {
         status: 'progress',
         progress,
-        label: goal.label,
+        label,
         detail: `純資産 ${yen(equity)} / 目標 ${yen(goal.target)}${tail}`,
       }
     }
@@ -46,17 +63,18 @@ export function evaluateGoal(goal: Goal, current: CompanyState, initial: Company
       const startDebt = interestBearingDebt(initial)
       const progress = startDebt > 0 ? clamp01(1 - debt / startDebt) : 1
       const within = goal.withinTurns
+      const label = modeLabel(goal.label, within)
       if (debt <= 0) {
-        return { status: 'won', progress: 1, label: goal.label, detail: '有利子負債を完済' }
+        return { status: 'won', progress: 1, label, detail: '有利子負債を完済' }
       }
       if (within !== undefined && turn >= within) {
-        return { status: 'lost', progress, label: goal.label, detail: `期限切れ（残債 ${yen(debt)}）` }
+        return { status: 'lost', progress, label, detail: `期限切れ（残債 ${yen(debt)}）` }
       }
       const tail = within !== undefined ? `・残り${within - turn}ヶ月` : ''
       return {
         status: 'progress',
         progress,
-        label: goal.label,
+        label,
         detail: `残債 ${yen(debt)}${tail}`,
       }
     }

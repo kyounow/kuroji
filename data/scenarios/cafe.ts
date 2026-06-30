@@ -58,7 +58,7 @@ export const cafeScenario: Scenario = {
   turnLimit: 96,
   goal: {
     kind: 'equityTarget',
-    label: '8年（96ヶ月）以内に純資産を 150万円に',
+    label: '純資産を 150万円にする',
     target: 1_500_000,
     withinTurns: 96,
   },
