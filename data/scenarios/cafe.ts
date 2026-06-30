@@ -32,7 +32,7 @@ export const cafeScenario: Scenario = {
     basePrice: 500,
     priceElasticity: 1.5,
     competitorStrength: 0.4,
-    demandNoise: 0.2, // 来客数は日々ブレる
+    demandNoise: 0.08, // 来客数は日々少しブレる（±8%）
     capacityPerEquipment: 0.0075, // 店舗40万 → 年間来客3,000 → 月次250
     scaleEconomyMax: 0.1,
     scaleEconomyHalf: 2_000_000,

@@ -32,7 +32,7 @@ export const startupScenario: Scenario = {
     basePrice: 5_000,
     priceElasticity: 0.8,
     competitorStrength: 0.35, // 研究開発で差別化する想定。競合は中程度に
-    demandNoise: 0.25, // 受注は読みにくい
+    demandNoise: 0.08, // 受注は月々少しブレる（±8%）
     capacityPerEquipment: 0.0012, // サーバー20万 → 年間240 → 月次20
     scaleEconomyMax: 0.4, // 自動化で限界費用が下がる
     scaleEconomyHalf: 1_500_000,

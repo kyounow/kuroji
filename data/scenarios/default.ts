@@ -35,7 +35,7 @@ export const defaultScenario: Scenario = {
     basePrice: 1_000,
     priceElasticity: 1.2,
     competitorStrength: 0.3,
-    demandNoise: 0.15, // 実需は±15%ブレる（プレビューは中心値）
+    demandNoise: 0.06, // 実需の月々の小さなブレ±6%（大きな変動は景気局面が担う）
     // 設備・生産能力
     capacityPerEquipment: 0.002, // 設備30万 → 年間能力600 → 月次50
     scaleEconomyMax: 0.2,
