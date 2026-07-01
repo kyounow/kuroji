@@ -25,6 +25,28 @@ export function saveBest(scenarioId: string, total: number): number {
   return best
 }
 
+// ---- 達成バッジ（実績・シナリオ横断で蓄積） ----
+const BADGES_KEY = 'kuroji.badges'
+
+/** 獲得済みバッジID一覧を読む。 */
+export function loadBadges(): string[] {
+  try {
+    const v = localStorage.getItem(BADGES_KEY)
+    return v ? (JSON.parse(v) as string[]) : []
+  } catch {
+    return []
+  }
+}
+
+/** 獲得済みバッジID一覧を保存する。 */
+export function saveBadges(ids: string[]): void {
+  try {
+    localStorage.setItem(BADGES_KEY, JSON.stringify(ids))
+  } catch {
+    /* 保存不可でも無視 */
+  }
+}
+
 // ---- ゲームの続き（全状態セーブ） ----
 // version はゲーム状態のスキーマ版。破壊的変更時に上げると古いセーブは無効化される。
 const SAVE_KEY = 'kuroji.save'

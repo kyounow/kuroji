@@ -1277,6 +1277,45 @@ table.history tbody tr[tabindex] {
   }
 }
 
+/* 達成バッジ（実績） */
+.badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.badge {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem;
+  text-align: center;
+  background: var(--bg);
+}
+
+.badge.got {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.badge.locked {
+  opacity: 0.55;
+}
+
+.badge-emoji {
+  font-size: 1.6rem;
+  line-height: 1.3;
+}
+
+.badge-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.badge-desc {
+  margin-top: 0.15rem;
+}
+
 /* 実現性警告（確定前） */
 .warnings {
   list-style: none;

@@ -74,10 +74,10 @@ export const cafeScenario: Scenario = {
     macroVolatility: 0.5,
   },
   turnLimit: 96,
+  // カフェは「借入を完済して無借金経営に」を目標に（純資産目標の他シナリオと差別化＝資金管理の学び）。
   goal: {
-    kind: 'equityTarget',
-    label: '純資産を 150万円にする',
-    target: 1_500_000,
+    kind: 'repayAll',
+    label: '借入を完済して無借金経営にする',
     withinTurns: 96,
   },
 }

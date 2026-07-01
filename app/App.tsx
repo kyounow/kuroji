@@ -25,8 +25,10 @@ import { ScoreCard } from './components/ScoreCard'
 import { SettingsModal } from './components/SettingsModal'
 import { useGlossary, InfoTip } from './components/Glossary'
 import { LinkageExplainer } from './components/LinkageExplainer'
+import { BadgesPanel } from './components/BadgesPanel'
 import { diagnoseGame } from './diagnosis'
-import { loadBest, saveBest, wasSaveStale } from './storage'
+import { earnedNow } from './badges'
+import { loadBest, saveBest, wasSaveStale, loadBadges, saveBadges } from './storage'
 import { yen, yenSigned, pct, num } from './format'
 
 /** 表示タブ。事業＝経営判断、財務＝三表・指標、市況＝景気・競合。 */
@@ -159,6 +161,24 @@ export function App() {
   useEffect(() => {
     if (gameOver && score) setBest(saveBest(game.scenarioId, score.total))
   }, [gameOver, score, game.scenarioId])
+
+  // 達成バッジ（シナリオ横断で蓄積）。満たした実績を localStorage に足していく。
+  const [earnedBadges, setEarnedBadges] = useState<Set<string>>(() => new Set(loadBadges()))
+  useEffect(() => {
+    const now = earnedNow(game)
+    if (gameOver && score?.stars === 3) now.push('three-star')
+    setEarnedBadges((prev) => {
+      const next = new Set(prev)
+      let changed = false
+      for (const id of now)
+        if (!next.has(id)) {
+          next.add(id)
+          changed = true
+        }
+      if (changed) saveBadges([...next])
+      return changed ? next : prev
+    })
+  }, [game, gameOver, score])
 
   // 現在の累積R&Dから決まる製品パラメータ（次の期に適用される）。
   const product = productFromRd(game.current.rdStock, scenario.params)
@@ -556,6 +576,8 @@ export function App() {
       />
 
       <HistoryChart initial={scenario.initialState} history={game.history} />
+
+      <BadgesPanel earned={earnedBadges} />
         </div>
       )}
 
