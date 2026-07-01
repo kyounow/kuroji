@@ -23,6 +23,8 @@ import { ForecastPanel } from './components/ForecastPanel'
 import { CapitalPanel } from './components/CapitalPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SettingsModal } from './components/SettingsModal'
+import { useGlossary, InfoTip } from './components/Glossary'
+import { diagnoseGame } from './diagnosis'
 import { loadBest, saveBest } from './storage'
 import { yen, yenSigned, pct, num } from './format'
 
@@ -31,6 +33,7 @@ type View = 'business' | 'finance' | 'market'
 
 export function App() {
   const { game, scenario, play, reset, newGame, scenarios, modes, upcomingEvent } = useGame()
+  const glossary = useGlossary()
   const gameOver = game.outcome !== 'playing'
 
   // ゲーム設定（シナリオ・モード）のポップアップ。新規（履歴なし）の起動時は自動で開く。
@@ -211,6 +214,9 @@ export function App() {
     return w
   }, [preview, decision.produceUnits, decision.financing, credit.borrowLimit])
 
+  // 終了時の診断（なぜ勝った/負けたか＋改善点）。
+  const diagnosis = useMemo(() => (gameOver ? diagnoseGame(game) : null), [gameOver, game])
+
   return (
     <main className="app">
       <header className="topbar">
@@ -219,6 +225,9 @@ export function App() {
           <span className="muted small">会計で学ぶ経営シミュレーション</span>
         </div>
         <div className="topbar-actions">
+          <button className="ghost" onClick={() => glossary.open()}>
+            📖 用語集
+          </button>
           <button className="ghost" onClick={() => setSettingsOpen(true)}>
             ⚙ 設定
           </button>
@@ -299,6 +308,20 @@ export function App() {
             </>
           )}
         </div>
+      )}
+
+      {gameOver && diagnosis && (
+        <section className="diagnosis">
+          <strong className="diagnosis-head">
+            📋 ふりかえり {diagnosis.term && <InfoTip term={diagnosis.term} />}
+          </strong>
+          <p className="diagnosis-headline">{diagnosis.headline}</p>
+          <ul className="diagnosis-points">
+            {diagnosis.points.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {gameOver && score && <ScoreCard score={score} best={best} won={game.outcome === 'won'} />}

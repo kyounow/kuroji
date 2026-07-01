@@ -1071,6 +1071,102 @@ footer {
   gap: 0.3rem;
 }
 
+/* 用語のⓘ（タップで用語集を開く） */
+.infotip {
+  border: none;
+  background: transparent;
+  color: var(--accent-2);
+  cursor: pointer;
+  padding: 0 0.15rem;
+  font-size: 0.95em;
+  line-height: 1;
+}
+
+.infotip:hover {
+  color: var(--accent);
+}
+
+/* 用語集モーダル */
+.glossary-modal {
+  max-width: 680px;
+}
+
+.glossary-search {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.glossary-body {
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.glossary-cat h3 {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.25rem;
+}
+
+.glossary-item {
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  margin-bottom: 0.3rem;
+}
+
+.glossary-item.focus {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  outline: 2px solid var(--accent);
+}
+
+.glossary-term {
+  font-weight: 700;
+}
+
+.glossary-def {
+  margin-top: 0.15rem;
+}
+
+.glossary-why {
+  margin-top: 0.2rem;
+}
+
+/* 黒字倒産などの気づきノート（プレビュー内） */
+.kuroji-note {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 8%, transparent);
+  border-radius: 4px;
+}
+
+/* 終了時の診断（ふりかえり） */
+.diagnosis {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1.1rem;
+  margin: 1rem 0;
+  background: var(--panel);
+}
+
+.diagnosis-head {
+  display: block;
+}
+
+.diagnosis-headline {
+  font-weight: 700;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.diagnosis-points {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
 /* 実現性警告（確定前） */
 .warnings {
   list-style: none;

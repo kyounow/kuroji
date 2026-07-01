@@ -1,6 +1,7 @@
 import type { Decision, TurnResult } from '@core/index'
 import { breakEven } from '@core/index'
 import { yen, pct, num } from '../format'
+import { InfoTip } from './Glossary'
 
 const intOr = (n: number, suffix = '') => (Number.isFinite(n) ? `${num(n)}${suffix}` : '—')
 
@@ -85,6 +86,14 @@ export function ForecastPanel({
           中心がこのライン以上なら黒字寄り。この販売数量での損益分岐単価は{' '}
           <strong>{yen(be.breakEvenPrice)}</strong>。
           {hasRange && <>（実際の需要は±{Math.round(demandNoise * 100)}%ほどブレるため、利益も上下します）</>}
+        </p>
+      )}
+
+      {profit > 0 && preview.cashFlow.netChange < 0 && (
+        <p className="kuroji-note small">
+          💡 <strong>黒字でも現金は減少</strong>（{yen(preview.cashFlow.netChange)}）。売掛金の回収前に仕入・投資・返済が
+          重なると、利益が出ていても資金が減ります＝<strong>黒字倒産</strong>の芽。
+          <InfoTip term="黒字倒産" />
         </p>
       )}
     </section>

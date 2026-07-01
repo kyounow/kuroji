@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { bookValuePerShare, earningsPerShare } from '@core/index'
 import { yen, num } from '../format'
+import { InfoTip } from './Glossary'
 
 /** 資本（株式）の状態: 発行済株数・1株あたり純資産(BVPS)・1株あたり純利益(EPS)。 */
 export const CapitalPanel = memo(function CapitalPanel({
@@ -25,13 +26,17 @@ export const CapitalPanel = memo(function CapitalPanel({
         </div>
         <div className="metric">
           <div className="metric-value">{yen(Math.round(bvps))}</div>
-          <div className="metric-label">1株あたり純資産（BVPS）</div>
+          <div className="metric-label">
+            1株あたり純資産（BVPS） <InfoTip term="BVPS" />
+          </div>
         </div>
         <div className="metric">
           <div className={`metric-value ${eps != null && eps < 0 ? 'ng' : ''}`}>
             {eps != null ? yen(Math.round(eps)) : '—'}
           </div>
-          <div className="metric-label">1株あたり純利益（直近月・EPS）</div>
+          <div className="metric-label">
+            1株あたり純利益（直近月・EPS） <InfoTip term="EPS" />
+          </div>
         </div>
       </div>
       <p className="muted small">

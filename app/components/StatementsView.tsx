@@ -10,6 +10,7 @@ import { yen, num, periodLabel } from '../format'
 import { BalanceSheetChart } from './BalanceSheetChart'
 import { WaterfallChart, type WaterfallStep } from './WaterfallChart'
 import { StatementsTrend } from './StatementsTrend'
+import { InfoTip } from './Glossary'
 
 interface Props {
   state: CompanyState
@@ -23,10 +24,24 @@ type Mode = 'chart' | 'table'
 type Layout = 'focus' | 'grid' | 'trend'
 type Tab = 'bs' | 'pl' | 'cf'
 
-function Row({ label, value, kind }: { label: string; value: number; kind?: 'sub' | 'total' }) {
+function Row({
+  label,
+  value,
+  kind,
+  term,
+}: {
+  label: string
+  value: number
+  kind?: 'sub' | 'total'
+  /** 用語集の語（あれば ⓘ を付ける） */
+  term?: string
+}) {
   return (
     <tr className={kind}>
-      <th>{label}</th>
+      <th>
+        {label}
+        {term && <InfoTip term={term} />}
+      </th>
       <td>{yen(value)}</td>
     </tr>
   )
@@ -88,20 +103,20 @@ function StatementsViewImpl({ state, last, periodsPerYear, history }: Props) {
         <tbody>
           <tr className="section"><th colSpan={2}>資産の部</th></tr>
           <Row label="現金" value={bs.currentAssets.cash} />
-          <Row label="売掛金" value={bs.currentAssets.accountsReceivable} />
+          <Row label="売掛金" value={bs.currentAssets.accountsReceivable} term="売掛金" />
           <Row label={`原材料（${num(state.materialUnits)}個）`} value={bs.currentAssets.rawMaterials} />
           <Row label={`製品（${num(state.finishedUnits)}個）`} value={bs.currentAssets.finishedGoods} />
           <Row label="流動資産 計" value={currentAssets} kind="sub" />
           <Row label="設備（簿価）" value={bs.fixedAssets.equipment} />
           <Row label="資産合計" value={totalAssets(bs)} kind="total" />
           <tr className="section"><th colSpan={2}>負債・純資産の部</th></tr>
-          <Row label="買掛金" value={bs.currentLiabilities.accountsPayable} />
+          <Row label="買掛金" value={bs.currentLiabilities.accountsPayable} term="買掛金" />
           <Row label="短期借入" value={bs.currentLiabilities.shortTermDebt} />
           <Row label="流動負債 計" value={currentLiabilities} kind="sub" />
           <Row label="長期借入" value={bs.nonCurrentLiabilities.longTermDebt} />
           <Row label="負債合計" value={totalLiabilities(bs)} kind="sub" />
           <Row label="資本金" value={bs.equity.capitalStock} />
-          <Row label="利益剰余金" value={bs.equity.retainedEarnings} />
+          <Row label="利益剰余金" value={bs.equity.retainedEarnings} term="利益剰余金" />
           <Row label="純資産合計" value={totalEquity(bs)} kind="sub" />
           <Row label="負債・純資産合計" value={totalLiabilities(bs) + totalEquity(bs)} kind="total" />
         </tbody>
@@ -116,12 +131,14 @@ function StatementsViewImpl({ state, last, periodsPerYear, history }: Props) {
     <table>
       <tbody>
         <Row label="売上高" value={pl.revenue} />
-        <Row label="売上原価" value={pl.costOfGoodsSold} />
+        <Row label="売上原価" value={pl.costOfGoodsSold} term="売上原価" />
         <Row label="売上総利益" value={pl.grossProfit} kind="sub" />
-        <Row label="販管費（含 減価償却・販促・R&D・保険）" value={pl.operatingExpenses} />
+        <Row label="販管費（含 減価償却・販促・R&D・保険）" value={pl.operatingExpenses} term="減価償却" />
         <Row label="営業利益" value={pl.operatingIncome} kind="sub" />
         <Row label="支払利息" value={pl.interestExpense} />
-        {pl.extraordinaryLoss > 0 && <Row label="特別損失（ショック）" value={pl.extraordinaryLoss} />}
+        {pl.extraordinaryLoss > 0 && (
+          <Row label="特別損失（ショック）" value={pl.extraordinaryLoss} term="特別損失" />
+        )}
         <Row label="税引前利益" value={pl.pretaxIncome} kind="sub" />
         <Row label="法人税等" value={pl.tax} />
         <tr className={pl.netIncome >= 0 ? 'total ok' : 'total ng'}>
