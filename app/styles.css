@@ -1167,6 +1167,20 @@ footer {
   gap: 0.3rem;
 }
 
+/* アップデート等の告知バナー（セーブのリセット通知など） */
+.notice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+  margin: 0.75rem 0;
+  border: 1px solid var(--accent-2);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-2) 8%, transparent);
+  font-size: 0.9rem;
+}
+
 /* 実現性警告（確定前） */
 .warnings {
   list-style: none;

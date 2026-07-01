@@ -25,7 +25,7 @@ import { ScoreCard } from './components/ScoreCard'
 import { SettingsModal } from './components/SettingsModal'
 import { useGlossary, InfoTip } from './components/Glossary'
 import { diagnoseGame } from './diagnosis'
-import { loadBest, saveBest } from './storage'
+import { loadBest, saveBest, wasSaveStale } from './storage'
 import { yen, yenSigned, pct, num } from './format'
 
 /** 表示タブ。事業＝経営判断、財務＝三表・指標、市況＝景気・競合。 */
@@ -40,6 +40,10 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(
     () => game.history.length === 0 && game.current.turn === 0,
   )
+  // アップデートで前回セーブが無効化された場合の告知（無言リセットを防ぐ）。
+  // useGame の自動保存が上書きする前（初回レンダー）に一度だけ判定する。
+  const [staleNotice, setStaleNotice] = useState(() => wasSaveStale())
+
   // 初回の「はじめかた」ガイド（一度閉じたら以後は出さない）。
   const [guideDismissed, setGuideDismissed] = useState(() => {
     try {
@@ -239,6 +243,18 @@ export function App() {
       <p className="lead">
         1期ずつ経営し、財務三表を見ながら<strong>純資産（黒字）を増やす</strong>のが目標。
       </p>
+
+      {staleNotice && (
+        <div className="notice">
+          <span>
+            ℹ️ アップデートにより、前回の途中セーブは新しい仕様に対応していないためリセットされました。
+            新しいゲームとして最初から始めてください（ベストスコアは保持されています）。
+          </span>
+          <button className="ghost icon-btn" aria-label="この知らせを閉じる" onClick={() => setStaleNotice(false)}>
+            ✕
+          </button>
+        </div>
+      )}
 
       <section className="status">
         <div>

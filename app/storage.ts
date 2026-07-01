@@ -52,6 +52,21 @@ export function loadGame(): unknown | null {
   }
 }
 
+/**
+ * アップデートでスキーマ版が変わり、前回のセーブが読めなくなった（＝今回リセットされる）か。
+ * 起動時に一度だけ判定して「進捗がリセットされた」告知を出すために使う（無言全消しを防ぐ）。
+ */
+export function wasSaveStale(): boolean {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY)
+    if (!raw) return false
+    const parsed = JSON.parse(raw) as { version?: number }
+    return parsed.version !== SAVE_VERSION
+  } catch {
+    return false
+  }
+}
+
 /** 保存済みゲームがあるか。 */
 export function hasSave(): boolean {
   return loadGame() !== null
