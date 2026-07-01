@@ -54,6 +54,7 @@ interface Props {
 
 /** 数値入力（ラベル付き）。 */
 function Field({
+  id,
   label,
   value,
   onChange,
@@ -61,6 +62,7 @@ function Field({
   min = 0,
   hint,
 }: {
+  id: string
   label: string
   value: number
   onChange: (v: number) => void
@@ -68,6 +70,7 @@ function Field({
   min?: number
   hint?: string
 }) {
+  const hintId = hint ? `${id}-hint` : undefined
   return (
     <label className="field">
       <span className="field-label">{label}</span>
@@ -78,10 +81,16 @@ function Field({
         placeholder="0"
         min={min}
         step={step}
+        inputMode="numeric"
+        aria-describedby={hintId}
         onFocus={(e) => e.currentTarget.select()}
         onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
       />
-      {hint && <span className="field-hint">{hint}</span>}
+      {hint && (
+        <span className="field-hint" id={hintId}>
+          {hint}
+        </span>
+      )}
     </label>
   )
 }
@@ -202,6 +211,7 @@ export function DecisionPanel({
         {visible.map((f) => (
           <Field
             key={f.key}
+            id={f.key}
             label={labelFor(f)}
             value={decision[f.key]}
             onChange={(v) => onChange({ [f.key]: v })}

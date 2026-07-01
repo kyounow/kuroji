@@ -105,7 +105,19 @@ function HistoryTableImpl({ history, selectedTurn, onSelect, periodsPerYear }: P
               const open = isOpen(g.year)
               return (
                 <Fragment key={`y${g.year}`}>
-                  <tr className="year-head" onClick={() => toggle(g.year)}>
+                  <tr
+                    className="year-head"
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={open}
+                    onClick={() => toggle(g.year)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        toggle(g.year)
+                      }
+                    }}
+                  >
                     <td>
                       {g.year === latestYear ? '▾' : open ? '▾' : '▸'} {g.year}年目
                       {g.year === latestYear && <span className="muted small">（進行中）</span>}
@@ -126,7 +138,16 @@ function HistoryTableImpl({ history, selectedTurn, onSelect, periodsPerYear }: P
                         <tr
                           key={rec.turn}
                           className={`month-row ${rec.turn === selectedTurn ? 'selected' : ''}`}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={rec.turn === selectedTurn}
                           onClick={() => onSelect(rec.turn)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              onSelect(rec.turn)
+                            }
+                          }}
                         >
                           <td className="month-cell">{subLabel(rec.turn, ppy)}</td>
                           <td>{rec.event.label}</td>

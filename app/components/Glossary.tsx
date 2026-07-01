@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { GLOSSARY, GLOSSARY_CATEGORIES, type GlossaryEntry } from '../glossary'
+import { useModalA11y } from '../useModalA11y'
 
 interface GlossaryCtx {
   /** 用語集を開く（term を渡すとその項目へスクロール＆強調）。 */
@@ -60,6 +61,7 @@ function matches(e: GlossaryEntry, q: string): boolean {
 }
 
 function GlossaryModal({ focusTerm, onClose }: { focusTerm?: string; onClose: () => void }) {
+  const modalRef = useModalA11y<HTMLDivElement>()
   const [q, setQ] = useState('')
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -83,6 +85,8 @@ function GlossaryModal({ focusTerm, onClose }: { focusTerm?: string; onClose: ()
         role="dialog"
         aria-modal="true"
         aria-label="会計用語集"
+        tabIndex={-1}
+        ref={modalRef}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { GameMode } from '../state'
+import { useModalA11y } from '../useModalA11y'
 
 interface Choice {
   id: string
@@ -39,6 +40,7 @@ export function SettingsModal({
   onStart,
   onClose,
 }: Props) {
+  const modalRef = useModalA11y<HTMLDivElement>()
   const [scenarioId, setScenarioId] = useState(currentScenarioId)
   const [mode, setMode] = useState<GameMode>(currentMode)
   // 展開シード。空欄でランダム（毎回違う市況・イベント）、数字を入れると同じ展開を再現。
@@ -67,6 +69,8 @@ export function SettingsModal({
         role="dialog"
         aria-modal="true"
         aria-label="ゲーム設定"
+        tabIndex={-1}
+        ref={modalRef}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">

@@ -32,6 +32,12 @@ import { yen, yenSigned, pct, num } from './format'
 /** 表示タブ。事業＝経営判断、財務＝三表・指標、市況＝景気・競合。 */
 type View = 'business' | 'finance' | 'market'
 
+const VIEWS: { key: View; label: string; sub: string }[] = [
+  { key: 'business', label: '🏭 事業', sub: '経営判断・予測' },
+  { key: 'finance', label: '📊 財務', sub: '三表・指標・履歴' },
+  { key: 'market', label: '🌐 市況', sub: '景気・競合' },
+]
+
 export function App() {
   const { game, scenario, play, reset, newGame, scenarios, modes, upcomingEvent } = useGame()
   const glossary = useGlossary()
@@ -351,38 +357,44 @@ export function App() {
         shockRisk={shockRisk}
       />
 
-      <nav className="viewtabs" role="tablist" aria-label="表示を切り替え">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'business'}
-          className={view === 'business' ? 'on' : ''}
-          onClick={() => setView('business')}
-        >
-          🏭 事業<span className="viewtabs-sub">経営判断・予測</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'finance'}
-          className={view === 'finance' ? 'on' : ''}
-          onClick={() => setView('finance')}
-        >
-          📊 財務<span className="viewtabs-sub">三表・指標・履歴</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'market'}
-          className={view === 'market' ? 'on' : ''}
-          onClick={() => setView('market')}
-        >
-          🌐 市況<span className="viewtabs-sub">景気・競合</span>
-        </button>
+      <nav
+        className="viewtabs"
+        role="tablist"
+        aria-label="表示を切り替え"
+        onKeyDown={(e) => {
+          const i = VIEWS.findIndex((v) => v.key === view)
+          let next = -1
+          if (e.key === 'ArrowRight') next = (i + 1) % VIEWS.length
+          else if (e.key === 'ArrowLeft') next = (i - 1 + VIEWS.length) % VIEWS.length
+          else if (e.key === 'Home') next = 0
+          else if (e.key === 'End') next = VIEWS.length - 1
+          if (next >= 0) {
+            e.preventDefault()
+            setView(VIEWS[next].key)
+            document.getElementById(`tab-${VIEWS[next].key}`)?.focus()
+          }
+        }}
+      >
+        {VIEWS.map((v) => (
+          <button
+            key={v.key}
+            id={`tab-${v.key}`}
+            type="button"
+            role="tab"
+            aria-selected={view === v.key}
+            aria-controls={`panel-${v.key}`}
+            tabIndex={view === v.key ? 0 : -1}
+            className={view === v.key ? 'on' : ''}
+            onClick={() => setView(v.key)}
+          >
+            {v.label}
+            <span className="viewtabs-sub">{v.sub}</span>
+          </button>
+        ))}
       </nav>
 
       {view === 'business' && (
-        <>
+        <div role="tabpanel" id="panel-business" aria-labelledby="tab-business">
       {!gameOver && game.history.length === 0 && !guideDismissed && (
         <section className="guide">
           <div className="guide-head">
@@ -504,11 +516,11 @@ export function App() {
           demandNoise={scenario.params.demandNoise ?? 0}
         />
       )}
-        </>
+        </div>
       )}
 
       {view === 'finance' && (
-        <>
+        <div role="tabpanel" id="panel-finance" aria-labelledby="tab-finance">
       <HistoryTable
         history={game.history}
         selectedTurn={selectedTurn}
@@ -544,11 +556,11 @@ export function App() {
       />
 
       <HistoryChart initial={scenario.initialState} history={game.history} />
-        </>
+        </div>
       )}
 
       {view === 'market' && (
-        <>
+        <div role="tabpanel" id="panel-market" aria-labelledby="tab-market">
           <MacroPanel macro={game.macro} effectiveRate={effectiveRate} />
 
           {hasCompetitor ? (
@@ -575,7 +587,7 @@ export function App() {
           ) : (
             <p className="muted small">このシナリオには直接の競合はいません（市場を独占的に供給）。</p>
           )}
-        </>
+        </div>
       )}
 
       <footer className="muted small">
