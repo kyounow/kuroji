@@ -487,7 +487,17 @@ export function App() {
       )}
 
       <footer className="muted small">
-        ※ 学習用の簡略モデルです。会計実務や実在企業の財務再現ではありません。
+        ※ 学習用の簡略モデルです。会計実務や実在企業の財務再現ではありません。 データはこのブラウザ内にのみ保存され、外部送信・追跡はありません。
+        <br />
+        <a
+          className="foot-link"
+          href="https://github.com/kyounow/kuroji/issues"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ご意見・不具合の報告
+        </a>
+        {' ・ '}© 2026 kyounow
       </footer>
 
       {settingsOpen && (
@@ -498,8 +508,9 @@ export function App() {
           currentMode={game.mode}
           hasProgress={game.history.length > 0}
           scenarioLocked={game.history.length > 0 && !gameOver}
-          onStart={(scenarioId, mode) => {
-            newGame(scenarioId, mode)
+          currentSeed={game.seed}
+          onStart={(scenarioId, mode, seed) => {
+            newGame(scenarioId, mode, seed)
             setSettingsOpen(false)
           }}
           onClose={() => setSettingsOpen(false)}

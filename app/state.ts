@@ -120,7 +120,7 @@ type Action =
   | { type: 'reset' }
   | { type: 'select'; scenarioId: string }
   | { type: 'setMode'; mode: GameMode }
-  | { type: 'newGame'; scenarioId: string; mode: GameMode }
+  | { type: 'newGame'; scenarioId: string; mode: GameMode; seed: number }
 
 /** 倒産判定: 現金がマイナス、または債務超過（純資産マイナス）。 */
 function isBankrupt(state: CompanyState): boolean {
@@ -301,7 +301,7 @@ function reducer(game: GameState, action: Action): GameState {
     case 'setMode':
       return makeInitial(game.scenarioId, game.seed, action.mode)
     case 'newGame':
-      return makeInitial(action.scenarioId, game.seed, action.mode)
+      return makeInitial(action.scenarioId, action.seed, action.mode)
     case 'reset':
       return makeInitial(game.scenarioId, game.seed, game.mode)
     case 'play':
@@ -334,7 +334,8 @@ export function useGame() {
   )
   const setMode = useCallback((mode: GameMode) => dispatch({ type: 'setMode', mode }), [])
   const newGame = useCallback(
-    (scenarioId: string, mode: GameMode) => dispatch({ type: 'newGame', scenarioId, mode }),
+    (scenarioId: string, mode: GameMode, seed: number) =>
+      dispatch({ type: 'newGame', scenarioId, mode, seed }),
     [],
   )
 

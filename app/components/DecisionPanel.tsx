@@ -193,7 +193,7 @@ export function DecisionPanel({
     <section className="panel">
       <h2>経営判断</h2>
       {enabled && (
-        <p className="muted small">このシナリオでは一部の判断のみ操作できます（段階的に解禁）。</p>
+        <p className="muted small">このシナリオでは基本操作（価格・仕入・生産）に絞っています。慣れたら別シナリオで全機能を。</p>
       )}
       <div className="fields">
         {visible.map((f) => (

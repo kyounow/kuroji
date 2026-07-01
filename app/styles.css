@@ -988,3 +988,34 @@ footer {
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
+
+/* 展開シードの入力 */
+.seed-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.seed-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* モーダル内の注記（免責・プライバシー） */
+.modal-note {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+/* フッターのリンク（フィードバック等） */
+.foot-link {
+  color: var(--accent-2);
+}

@@ -16,8 +16,15 @@ interface Props {
   hasProgress: boolean
   /** プレイ中はシナリオ（業種）を固定する（誤って別業種に切り替えて進行を失わないように）。 */
   scenarioLocked: boolean
-  onStart: (scenarioId: string, mode: GameMode) => void
+  /** 現在のゲームの展開シード（表示・共有用）。 */
+  currentSeed: number
+  onStart: (scenarioId: string, mode: GameMode, seed: number) => void
   onClose: () => void
+}
+
+/** 展開シードを1つ選ぶ（決定論RNGの入力＝会計計算ではないので Math.random 可）。 */
+function randomSeed(): number {
+  return Math.floor(Math.random() * 1_000_000_000)
 }
 
 /** ゲーム設定（シナリオ・モード）のポップアップ。プレイ画面から分離した開始/設定用。 */
@@ -28,11 +35,18 @@ export function SettingsModal({
   currentMode,
   hasProgress,
   scenarioLocked,
+  currentSeed,
   onStart,
   onClose,
 }: Props) {
   const [scenarioId, setScenarioId] = useState(currentScenarioId)
   const [mode, setMode] = useState<GameMode>(currentMode)
+  // 展開シード。空欄でランダム（毎回違う市況・イベント）、数字を入れると同じ展開を再現。
+  const [seedInput, setSeedInput] = useState('')
+  const start = () => {
+    const parsed = seedInput.trim() === '' ? NaN : Number(seedInput)
+    onStart(scenarioId, mode, Number.isFinite(parsed) ? Math.floor(parsed) : randomSeed())
+  }
   // プレイ中はシナリオを固定。明示的に「破棄して別業種で始める」を押した時だけ解除。
   const [overrideScenario, setOverrideScenario] = useState(false)
   const scenarioEditable = !scenarioLocked || overrideScenario
@@ -113,6 +127,33 @@ export function SettingsModal({
           </div>
         </fieldset>
 
+        <fieldset className="choice-group">
+          <legend>展開のシード（任意）</legend>
+          <div className="seed-row">
+            <input
+              type="text"
+              inputMode="numeric"
+              className="seed-input"
+              placeholder="空欄でランダム"
+              value={seedInput}
+              onChange={(e) => setSeedInput(e.target.value.replace(/[^0-9]/g, ''))}
+              aria-label="展開のシード（数字。空欄でランダム）"
+            />
+            <button type="button" className="ghost" onClick={() => setSeedInput(String(randomSeed()))}>
+              🎲 ランダム
+            </button>
+          </div>
+          <p className="muted small">
+            同じ数字＝同じ市況・イベントの展開（再現・共有できます）。空欄なら毎回ランダム。 現在の展開:{' '}
+            <strong>#{currentSeed.toLocaleString('ja-JP')}</strong>
+          </p>
+        </fieldset>
+
+        <p className="muted small modal-note">
+          ※ 会計を学ぶための<strong>簡略化した学習用シミュレーション</strong>です（会計実務・実在企業の再現ではありません）。
+          データはこのブラウザ内にのみ保存され、<strong>外部送信・追跡はありません</strong>。
+        </p>
+
         {hasProgress && (
           <p className="muted small modal-warn">
             ⚠ 「この設定で始める」を押すと<strong>最初から</strong>になります。今の経営を続けるには「閉じる」。
@@ -120,7 +161,7 @@ export function SettingsModal({
         )}
 
         <div className="modal-actions">
-          <button onClick={() => onStart(scenarioId, mode)}>この設定で始める ▶</button>
+          <button onClick={start}>この設定で始める ▶</button>
           <button className="ghost" onClick={onClose}>
             {hasProgress ? '閉じる（経営を続ける）' : '閉じる'}
           </button>
