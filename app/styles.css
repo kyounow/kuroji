@@ -1181,6 +1181,65 @@ footer {
   font-size: 0.9rem;
 }
 
+/* 指標の健全度短評 */
+.metric-verdict {
+  font-size: 0.72rem;
+  margin-top: 0.15rem;
+  color: var(--muted);
+}
+
+.metric-verdict.ok {
+  color: var(--good);
+}
+
+.metric-verdict.ng {
+  color: var(--bad);
+}
+
+/* スコアの軸別コメント（グリッド全幅で折返し） */
+.score-comment {
+  grid-column: 1 / -1;
+  margin-top: 0.05rem;
+}
+
+/* 三表のつながり */
+.linkage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.4rem 0;
+  line-height: 1.5;
+}
+
+.linkage-tag {
+  display: inline-block;
+  min-width: 2.2rem;
+  text-align: center;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.linkage-tag.pl {
+  background: var(--good);
+}
+
+.linkage-tag.bs {
+  background: var(--accent-2);
+}
+
+.linkage-tag.cf {
+  background: #7a5cc0;
+}
+
+.linkage-arrow {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 /* 実現性警告（確定前） */
 .warnings {
   list-style: none;

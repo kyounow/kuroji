@@ -24,6 +24,7 @@ import { CapitalPanel } from './components/CapitalPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SettingsModal } from './components/SettingsModal'
 import { useGlossary, InfoTip } from './components/Glossary'
+import { LinkageExplainer } from './components/LinkageExplainer'
 import { diagnoseGame } from './diagnosis'
 import { loadBest, saveBest, wasSaveStale } from './storage'
 import { yen, yenSigned, pct, num } from './format'
@@ -520,6 +521,8 @@ export function App() {
         turn={selected?.turn}
         periodsPerYear={ppy}
       />
+
+      {selected && <LinkageExplainer record={selected} />}
 
       {game.current.sharesOutstanding != null && game.current.sharesOutstanding > 0 && (
         <CapitalPanel
