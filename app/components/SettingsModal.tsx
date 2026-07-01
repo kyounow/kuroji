@@ -76,6 +76,17 @@ export function SettingsModal({
           </button>
         </div>
 
+        {!hasProgress && (
+          <div className="modal-intro">
+            <p className="intro-lead">会社を1期ずつ経営して、会計（BS・PL・CF）を学ぶゲームです。</p>
+            <p className="muted small">
+              毎期「価格・仕入・生産…」などを決めて <strong>「1期すすめる」</strong> を押すと、その判断が
+              財務三表に反映されます。<strong>倒産せず純資産（黒字）を増やす</strong>のが目標。
+              初めての方は下の <strong>チュートリアル</strong> から。
+            </p>
+          </div>
+        )}
+
         <fieldset className="choice-group">
           <legend>
             シナリオ（業種）
@@ -91,7 +102,10 @@ export function SettingsModal({
                 disabled={!scenarioEditable && scenarioId !== s.id}
                 onClick={() => scenarioEditable && setScenarioId(s.id)}
               >
-                <span className="choice-name">{s.name}</span>
+                <span className="choice-name">
+                  {s.name}
+                  {s.id === 'tutorial' && <span className="badge-rec">初めての方に</span>}
+                </span>
                 {s.description && <span className="choice-desc">{s.description}</span>}
               </button>
             ))}

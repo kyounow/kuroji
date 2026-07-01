@@ -7,6 +7,8 @@ interface Props {
   onChange: (patch: Partial<Decision>) => void
   onPlay: () => void
   disabled: boolean
+  /** この判断の実現性警告（倒産・能力/借入枠オーバー）。空なら非表示。 */
+  warnings?: string[]
   /** 当期の原材料スポット単価（仕入の単価表示に使用） */
   materialUnitCost: number
   /** 操作可能な判断フィールド（未指定なら全て） */
@@ -120,6 +122,7 @@ export function DecisionPanel({
   onChange,
   onPlay,
   disabled,
+  warnings = [],
   materialUnitCost,
   enabled,
   creditGrade,
@@ -208,6 +211,13 @@ export function DecisionPanel({
           />
         ))}
       </div>
+      {warnings.length > 0 && (
+        <ul className="warnings" aria-live="polite">
+          {warnings.map((w, i) => (
+            <li key={i}>⚠ {w}</li>
+          ))}
+        </ul>
+      )}
       <div className="actions">
         <button onClick={onPlay} disabled={disabled}>
           この判断で1期すすめる ▶

@@ -37,6 +37,22 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(
     () => game.history.length === 0 && game.current.turn === 0,
   )
+  // 初回の「はじめかた」ガイド（一度閉じたら以後は出さない）。
+  const [guideDismissed, setGuideDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('kuroji.guideSeen') === '1'
+    } catch {
+      return false
+    }
+  })
+  const dismissGuide = useCallback(() => {
+    setGuideDismissed(true)
+    try {
+      localStorage.setItem('kuroji.guideSeen', '1')
+    } catch {
+      /* 保存不可でも続行 */
+    }
+  }, [])
   const currentModeName = modes.find((m) => m.id === game.mode)?.name ?? game.mode
 
   // 表示タブ（事業 / 財務 / 市況）。最後に見たタブを localStorage で記憶（セーブ本体とは別キー）。
@@ -180,6 +196,21 @@ export function App() {
   // 次の期のショック発生確率リスク（保全水準/品質で低下）。
   const shockRisk = useMemo(() => shockRiskFor(game), [game])
 
+  // この判断の実現性チェック（確定前の警告。倒産・能力/借入枠オーバーを未然に知らせる）。
+  const warnings = useMemo(() => {
+    const w: string[] = []
+    if (Number.isFinite(preview.capacity) && decision.produceUnits > preview.capacity) {
+      w.push(`生産数量 ${num(decision.produceUnits)} が今月の生産能力 ${num(preview.capacity)} を超えています（超過分は作れません）`)
+    }
+    if (decision.financing > credit.borrowLimit) {
+      w.push(`借入 ${yen(decision.financing)} が借入上限 ${yen(credit.borrowLimit)} を超えています（上限まで自動で制限されます）`)
+    }
+    if (preview.cashFlow.cashEnd < 0) {
+      w.push(`この判断だと期末の現金が ${yen(preview.cashFlow.cashEnd)}（マイナス）になり、倒産の恐れがあります`)
+    }
+    return w
+  }, [preview, decision.produceUnits, decision.financing, credit.borrowLimit])
+
   return (
     <main className="app">
       <header className="topbar">
@@ -312,6 +343,24 @@ export function App() {
 
       {view === 'business' && (
         <>
+      {!gameOver && game.history.length === 0 && !guideDismissed && (
+        <section className="guide">
+          <div className="guide-head">
+            <strong>👋 はじめかた（1分でわかる遊び方）</strong>
+            <button className="ghost icon-btn" aria-label="ガイドを閉じる" onClick={dismissGuide}>
+              ✕
+            </button>
+          </div>
+          <ol className="guide-steps">
+            <li>この「事業」タブで<strong>価格・仕入・生産</strong>などを決めます（まずは初期値のままでOK）。</li>
+            <li>下の<strong>「この判断で1期すすめる ▶」</strong>を押すと1ヶ月が経過します。</li>
+            <li>
+              結果は<strong>「財務」タブ</strong>の三表（BS・PL・CF）に反映されます。
+              <strong>倒産せず純資産（黒字）を増やす</strong>のが目標です。
+            </li>
+          </ol>
+        </section>
+      )}
       <section className="product">
         <h2>製品・原材料の状態</h2>
         <div className="product-grid">
@@ -405,6 +454,7 @@ export function App() {
         maxAttrition={scenario.params.maxAttrition}
         equity={equity}
         sharesOutstanding={game.current.sharesOutstanding}
+        warnings={warnings}
       />
 
       {!gameOver && (

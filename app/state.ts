@@ -30,7 +30,9 @@ import { getEventTable } from '@data/events'
 import { saveGame, loadGame } from './storage'
 
 const DEFAULT_SEED = 12345
-const DEFAULT_SCENARIO = 'default'
+// 初見プレイヤーの既定はチュートリアル（操作を価格・仕入・生産に絞って学べる）。
+// 続きから復元される既存プレイヤーには影響しない。
+const DEFAULT_SCENARIO = 'tutorial'
 /** 横軸の安全弁（~100年＝1200ヶ月）。 */
 const MAX_TURNS = 1200
 
