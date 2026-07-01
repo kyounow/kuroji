@@ -265,6 +265,21 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     )
   })
 
+  it('マイナスの設備投資は 0 に丸められ、設備簿価を負にしない', () => {
+    const { initialState, params } = base()
+    const eq0 = initialState.balanceSheet.fixedAssets.equipment
+    const { state, cashFlow } = resolveTurn(
+      initialState,
+      decide({ capitalExpenditure: -(eq0 + 10_000_000) }),
+      params,
+    )
+    // 負の capex は無効化（減価償却のみ設備が減り、負にはならない・投資CFに架空の流入なし）。
+    expect(state.balanceSheet.fixedAssets.equipment).toBeGreaterThanOrEqual(0)
+    expect(state.balanceSheet.fixedAssets.equipment).toBeLessThanOrEqual(eq0)
+    expect(cashFlow.investing === 0).toBe(true) // -0 でも 0（架空の現金流入なし）
+    expect(balances(state.balanceSheet)).toBe(true)
+  })
+
   it('信用枠を超える借入はキャップされる（D格付けは借入凍結）', () => {
     const { initialState, params } = base()
     // 資産1,000万 = 負債900万 + 純資産100万（自己資本比率0.1→D）。恒等式を満たす弱い状態。

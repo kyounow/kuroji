@@ -53,8 +53,10 @@ export function resolveTurn(
   const inflationIndex = options.inflationIndex ?? 1
   const macroDemandMultiplier = options.macroDemandMultiplier ?? 1
 
+  // 当期の設備投資は 0 フロア（負値は設備処分を意味しないため無効化＝簿価を負にしない）。
+  const capex = Math.max(0, decision.capitalExpenditure)
   // 当期の設備投資は当期から有効（期首設備＋当期 capex）。能力・コストに即反映する。
-  const opEquipment = bs.fixedAssets.equipment + Math.max(0, decision.capitalExpenditure)
+  const opEquipment = bs.fixedAssets.equipment + capex
 
   // 当期の従業員数（採用・解雇を当期から反映＝即戦力）。人件費・労働能力を規定する。
   const hire = Math.max(0, decision.hire)
@@ -254,7 +256,7 @@ export function resolveTurn(
   // 非現金の設備減（減価償却＋設備毀損）を足し戻す。保険補償分の現金は netIncome 経由で流入。
   const nonCashEquipReduction = depreciation + equipmentWritedown
   const operating = netIncome + nonCashEquipReduction - deltaAR - deltaInventory + deltaAP
-  const investing = -decision.capitalExpenditure
+  const investing = -capex
   const financingCF = financing + equityIssue // 借入＋増資（株式発行）
   const netChange = operating + investing + financingCF
   const cashEnd = cashBegin + netChange
@@ -304,7 +306,7 @@ export function resolveTurn(
         finishedGoods: finValEnd,
       },
       fixedAssets: {
-        equipment: bs.fixedAssets.equipment - nonCashEquipReduction + decision.capitalExpenditure,
+        equipment: bs.fixedAssets.equipment - nonCashEquipReduction + capex,
       },
       currentLiabilities: {
         accountsPayable: apEnd,

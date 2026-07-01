@@ -15,15 +15,15 @@ export const startupScenario: Scenario = {
     finishedUnits: 0,
     materialIndex: 1.0,
     rdStock: 0,
-    headcount: 4, // エンジニア4人。労働＝処理能力。4×60/年=240/年=月20（サーバー処理能力と同じ）
+    headcount: 3, // エンジニア3人（精鋭・軽量）。労働＝処理能力。3×80/年=240/年=月20（サーバー処理能力と同じ）
     condition: 1,
     sharesOutstanding: 1_000, // 創業株式1,000株
     balanceSheet: {
-      currentAssets: { cash: 1_000_000, accountsReceivable: 0, rawMaterials: 50_000, finishedGoods: 0 },
+      currentAssets: { cash: 1_100_000, accountsReceivable: 0, rawMaterials: 50_000, finishedGoods: 0 },
       fixedAssets: { equipment: 200_000 },
       currentLiabilities: { accountsPayable: 0, shortTermDebt: 0 },
       nonCurrentLiabilities: { longTermDebt: 500_000 },
-      equity: { capitalStock: 1_000_000, retainedEarnings: -250_000 },
+      equity: { capitalStock: 1_000_000, retainedEarnings: -150_000 }, // 創業赤字（緩め＝受動でも即倒産しない buffer）
     },
   },
   params: {
@@ -31,7 +31,7 @@ export const startupScenario: Scenario = {
     baseDemand: 240,
     basePrice: 5_000,
     priceElasticity: 0.8,
-    competitorStrength: 0.35, // 研究開発で差別化する想定。競合は中程度に
+    competitorStrength: 0.25, // 研究開発で差別化する想定。競合は控えめ（受動でも薄利で生き延びられる程度）
     demandNoise: 0.08, // 受注は月々少しブレる（±8%）
     capacityPerEquipment: 0.0012, // サーバー20万 → 年間240 → 月次20
     scaleEconomyMax: 0.4, // 自動化で限界費用が下がる
@@ -41,11 +41,11 @@ export const startupScenario: Scenario = {
     unitVariableCost: 500,
     materialVolatility: 0.1,
     materialMeanReversion: 0.4,
-    fixedCosts: 40_000, // オフィス・その他（人件費は wage に分離）
+    fixedCosts: 30_000, // オフィス・その他（人件費は wage に分離。受動でも期限まで生存できるよう軽め）
     depreciationRate: 0.2, // 陳腐化が速い
-    // 人的リソース（エンジニアが価値の源泉＝労働集約）。初期人件費 4×140,000=560,000 で旧600,000と均衡。
-    wage: 140_000, // エンジニア年俸
-    laborPerHead: 60, // 1人あたり年60件（4人=240/年=月20＝処理能力と同じ）
+    // 人的リソース（エンジニアが価値の源泉＝労働集約）。受動でも即倒産せず「R&Dしないと勝てない」を学べる水準に。
+    wage: 125_000, // エンジニア年俸（初期人件費 4×125,000=500,000/年）
+    laborPerHead: 80, // 1人あたり年80件（3人=240/年=月20＝処理能力と同じ）
     hireCost: 30_000, // 採用が高い
     severance: 25_000,
     attritionSlope: 0.7, // エンジニアは待遇に敏感で流動性が高い
@@ -71,7 +71,7 @@ export const startupScenario: Scenario = {
     effectiveTaxRate: 0.3,
     inflationTarget: 0.02,
     policyNeutralRate: 0.01,
-    macroVolatility: 0.6,
+    macroVolatility: 0.45, // 景気変動は大きめだが、薄利のITが受動でも即倒産しない程度に緩和
   },
   turnLimit: 96,
   goal: {
