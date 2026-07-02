@@ -71,8 +71,8 @@ export const startupScenario: Scenario = {
     effectiveTaxRate: 0.3,
     // IPO・上場（スタートアップの本懐。テック水準の高PER・知名度効果も大きい）
     earningsMultiple: 15, // 時価総額＝年間純利益×15
-    ipoMaxRaiseRatio: 0.5,
-    listingCost: 100_000, // 上場維持コスト（年額）
+    ipoMaxRaiseRatio: 0.35, // 高PER×大量調達→過剰投資の罠になりやすいため控えめに
+    listingCost: 36_000, // 上場維持コスト（年額。IT の月次利益規模に見合う水準＝月3,000円）
     listingDemandBoost: 0.15, // 上場の知名度で需要+15%
     ipoEquityThreshold: 1_000_000,
     ipoProfitablePeriods: 6,

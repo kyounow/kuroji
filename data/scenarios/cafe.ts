@@ -19,11 +19,12 @@ export const cafeScenario: Scenario = {
     condition: 1,
     sharesOutstanding: 1_000, // 創業株式1,000株
     balanceSheet: {
-      currentAssets: { cash: 500_000, accountsReceivable: 0, rawMaterials: 20_000, finishedGoods: 10_000 },
+      currentAssets: { cash: 600_000, accountsReceivable: 0, rawMaterials: 20_000, finishedGoods: 10_000 },
       fixedAssets: { equipment: 400_000 },
       currentLiabilities: { accountsPayable: 0, shortTermDebt: 0 },
-      nonCurrentLiabilities: { longTermDebt: 300_000 },
-      equity: { capitalStock: 500_000, retainedEarnings: 130_000 },
+      // 開業資金の大半を借入で賄った設定（現金より大きい借入）＝「稼ぎながら返す」が完済目標の本体になる。
+      nonCurrentLiabilities: { longTermDebt: 600_000 },
+      equity: { capitalStock: 400_000, retainedEarnings: 30_000 },
     },
   },
   params: {
@@ -47,7 +48,7 @@ export const cafeScenario: Scenario = {
     unitVariableCost: 200,
     materialVolatility: 0.2,
     materialMeanReversion: 0.3,
-    fixedCosts: 120_000, // 家賃・その他（人件費は wage に分離）
+    fixedCosts: 108_000, // 家賃・その他（人件費は wage に分離。借入増に伴い受動でも半数は生き残る水準に微調整）
     depreciationRate: 0.1,
     // 人的リソース（接客が中心の労働集約）。初期人件費 8×30,000=240,000 で旧360,000と均衡。
     wage: 30_000,

@@ -40,7 +40,7 @@ export const defaultScenario: Scenario = {
     productLines: [
       { id: 'std', name: '標準品', baseDemand: 600, basePrice: 1_000, priceElasticity: 1.2, unitVariableCost: 520 },
       // 高級品: 少量・高単価・高粗利。ただし共有能力を食うので標準品との配分がトレードオフ。
-      { id: 'premium', name: '高級品', baseDemand: 96, basePrice: 2_400, priceElasticity: 0.9, unitVariableCost: 1_200, rdDemandBoostMax: 0.7 },
+      { id: 'premium', name: '高級品', baseDemand: 120, basePrice: 2_400, priceElasticity: 0.9, unitVariableCost: 1_200, rdDemandBoostMax: 0.7 },
     ],
     // 設備・生産能力
     capacityPerEquipment: 0.002, // 設備30万 → 年間能力600 → 月次50
@@ -87,8 +87,8 @@ export const defaultScenario: Scenario = {
     // IPO・上場（町工場でも成長すれば上場できる。PERは製造業の控えめな水準）
     earningsMultiple: 12, // 時価総額＝年間純利益×12
     ipoMaxRaiseRatio: 0.5, // 公募調達は時価総額の50%まで
-    listingCost: 60_000, // 上場維持コスト（年額。監査・IR）
-    listingDemandBoost: 0.08, // 上場の知名度で需要+8%
+    listingCost: 18_000, // 上場維持コスト（年額。監査・IR。月次利益~1万円の規模に見合う水準＝月1,500円）
+    listingDemandBoost: 0.12, // 上場の知名度で需要+12%（能力を広げてこそ効く＝再投資の学び）
     ipoEquityThreshold: 1_000_000, // 純資産100万円以上
     ipoProfitablePeriods: 6, // 直近6ヶ月連続黒字
     // M&A（同業の町工場を買収して競合を消す）

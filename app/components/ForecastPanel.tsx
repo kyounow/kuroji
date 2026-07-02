@@ -17,7 +17,11 @@ export function ForecastPanel({
   demandNoise?: number
 }) {
   const pl = preview.incomeStatement
-  const be = breakEven({ unitPrice: decision.unitPrice, unitsSold: preview.unitsSold, income: pl })
+  // 損益分岐の単価: 複数ラインは「混合単価＝売上÷販売数」で全社概算（隠れたスカラー単価で誤誘導しない）。
+  const isMulti = preview.lineResults.length > 1
+  const blendedPrice =
+    isMulti && preview.unitsSold > 0 ? pl.revenue / preview.unitsSold : decision.unitPrice
+  const be = breakEven({ unitPrice: blendedPrice, unitsSold: preview.unitsSold, income: pl })
   const sold = preview.unitsSold
   const profit = pl.netIncome
   const aboveBE = Number.isFinite(be.breakEvenUnits) && sold >= be.breakEvenUnits
@@ -64,7 +68,7 @@ export function ForecastPanel({
           <div className="metric-value">
             {yen(be.unitCost)} / {yen(be.contributionPerUnit)}
           </div>
-          <div className="metric-label">1個あたり 原価 / 粗利（限界利益）</div>
+          <div className="metric-label">1個あたり 原価 / 粗利（限界利益）{isMulti ? '※混合単価' : ''}</div>
         </div>
         <div className="metric">
           <div className={`metric-value ${aboveBE ? 'ok' : 'ng'}`}>{intOr(be.breakEvenUnits, '個')}</div>

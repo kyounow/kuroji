@@ -84,6 +84,8 @@ export interface GameState {
   goalStatus: GoalStatus | null
   /** エンドレスで目標を達成済みか（マイルストーン。ゲームは継続）。 */
   goalAchieved: boolean
+  /** エンドレスのマイルストーン段階（達成のたび +1。目標額は 2^level 倍）。未設定は 0。 */
+  milestoneLevel?: number
 }
 
 /** endless では期限（withinTurns）を外し、目標を「マイルストーン」として扱う。 */
@@ -98,10 +100,20 @@ function evalGoal(
   scenarioId: string,
   current: CompanyState,
   mode: GameMode,
+  milestoneLevel = 0,
 ): GoalStatus | null {
   const scenario = getScenario(scenarioId)
   if (!scenario.goal) return null
-  const goal = mode === 'endless' ? stripDeadline(scenario.goal) : scenario.goal
+  let goal = mode === 'endless' ? stripDeadline(scenario.goal) : scenario.goal
+  // エンドレスの equityTarget は達成のたびに目標を倍にした「次のマイルストーン」を出す（無目標状態を作らない）。
+  if (mode === 'endless' && goal.kind === 'equityTarget' && milestoneLevel > 0) {
+    const target = goal.target * 2 ** milestoneLevel
+    goal = {
+      ...goal,
+      target,
+      label: `稼いだ純資産を ¥${target.toLocaleString('ja-JP')} にする（マイルストーン${milestoneLevel + 1}）`,
+    }
+  }
   return evaluateGoal(goal, current, scenario.initialState)
 }
 
@@ -113,12 +125,13 @@ export function defaultDecision(scenarioId: string): Decision {
   const { params } = getScenario(scenarioId)
   const ppy = params.periodsPerYear ?? 1
   const perPeriod = Math.round(params.baseDemand / ppy)
-  // 複数製品シナリオはライン別の既定値（各ラインの基準需要ぶんを仕入・生産）。
+  // 複数製品シナリオはライン別の既定値。主力（ライン0）は基準需要ぶん、
+  // 2本目以降は既定で休止＝プレイヤーが明示的に立ち上げる（受動プレイの現金を守り、新ライン開始を経営判断にする）。
   const lines = params.productLines?.length
-    ? params.productLines.map((lp) => ({
+    ? params.productLines.map((lp, i) => ({
         unitPrice: lp.basePrice,
-        purchaseMaterials: Math.round(lp.baseDemand / ppy),
-        produceUnits: Math.round(lp.baseDemand / ppy),
+        purchaseMaterials: i === 0 ? Math.round(lp.baseDemand / ppy) : 0,
+        produceUnits: i === 0 ? Math.round(lp.baseDemand / ppy) : 0,
         marketingSpend: 0,
         rdSpend: 0,
       }))
@@ -338,7 +351,8 @@ export function advanceTurn(game: GameState, decision: Decision): GameState {
   }
 
   const bankrupt = isBankrupt(result.state)
-  let goalStatus = evalGoal(game.scenarioId, result.state, game.mode)
+  let milestoneLevel = game.milestoneLevel ?? 0
+  let goalStatus = evalGoal(game.scenarioId, result.state, game.mode, milestoneLevel)
   let goalAchieved = game.goalAchieved
 
   let outcome: Outcome = 'playing'
@@ -350,8 +364,12 @@ export function advanceTurn(game: GameState, decision: Decision): GameState {
     if (goalStatus) outcome = goalStatus.status === 'progress' ? 'playing' : goalStatus.status
     else if (scenario.turnLimit && result.state.turn >= scenario.turnLimit) outcome = 'won'
   } else {
-    // エンドレス: 目標達成はマイルストーン（継続）。期限切れは無し（deadline 除去済み）。
-    if (goalStatus && goalStatus.status === 'won') goalAchieved = true
+    // エンドレス: 目標達成はマイルストーン（継続）。equityTarget は達成のたび目標を倍にして次を出す。
+    if (goalStatus && goalStatus.status === 'won') {
+      goalAchieved = true
+      milestoneLevel += 1
+      goalStatus = evalGoal(game.scenarioId, result.state, game.mode, milestoneLevel) ?? goalStatus
+    }
     if (result.state.turn >= MAX_TURNS) outcome = 'won' // 100年完走
   }
 
@@ -363,6 +381,7 @@ export function advanceTurn(game: GameState, decision: Decision): GameState {
     outcome,
     goalStatus,
     goalAchieved,
+    milestoneLevel: milestoneLevel > 0 ? milestoneLevel : game.milestoneLevel,
   }
 }
 

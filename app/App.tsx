@@ -331,7 +331,11 @@ export function App() {
 
       {game.mode === 'endless' && game.goalAchieved && !gameOver && (
         <div className="gameover won">
-          <strong>🏆 マイルストーン達成！</strong> {game.goalStatus?.label}。このまま経営を続けられます。
+          <strong>🏆 マイルストーン達成！</strong>{' '}
+          {game.goalStatus && game.goalStatus.status !== 'won'
+            ? `次の目標: ${game.goalStatus.label}。`
+            : `${game.goalStatus?.label ?? ''}。`}
+          このまま経営を続けられます。
         </div>
       )}
 
@@ -452,7 +456,12 @@ export function App() {
         <div className="product-grid">
           <div className="metric">
             <div className="metric-value">{yen(spotCost)}</div>
-            <div className="metric-label">原材料スポット単価/個（基準 {yen(scenario.params.unitVariableCost)}）</div>
+            <div className="metric-label">
+              原材料スポット単価/個
+              {(scenario.params.productLines?.length ?? 0) > 1
+                ? `（${scenario.params.productLines![0].name}。他ラインは下表）`
+                : `（基準 ${yen(scenario.params.unitVariableCost)}）`}
+            </div>
           </div>
           <div className="metric">
             <div className="metric-value">{(game.current.materialIndex).toFixed(2)}</div>
@@ -514,6 +523,7 @@ export function App() {
               <thead>
                 <tr>
                   <th>ライン</th>
+                  <th className="r">仕入単価</th>
                   <th className="r">原材料 在庫</th>
                   <th className="r">製品 在庫</th>
                   <th className="r">累積R&D</th>
@@ -526,6 +536,7 @@ export function App() {
                   return (
                     <tr key={lp.id}>
                       <td>{lp.name}</td>
+                      <td className="r">{yen(preview.lineResults[i]?.effectiveUnitCost ?? lp.unitVariableCost)}</td>
                       <td className="r">{num(l.materialUnits)}個</td>
                       <td className="r">{num(l.finishedUnits)}個</td>
                       <td className="r">{yen(l.rdStock)}</td>
