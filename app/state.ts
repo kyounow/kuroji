@@ -7,6 +7,7 @@ import {
   competitorAt,
   shareMultiplier,
   productFromRd,
+  composeLineDefs,
   ipoValuation,
   evaluateGoal,
   initialMacro,
@@ -262,11 +263,12 @@ function breakdownFireRate(game: GameState): number {
  */
 function companyQuality(game: GameState): number {
   const p = getScenario(game.scenarioId).params
-  const lines = game.current.lines
-  if (p.productLines?.length && lines?.length) {
+  // ライン構成は composeLineDefs が唯一のソース（商材開発でローンチした新ラインも含めて品質を見る）。
+  const defs = composeLineDefs(p, game.current, game.current.turn)
+  if (defs.length > 1 && game.current.lines?.length) {
     return Math.min(
-      ...p.productLines.map((lp, i) =>
-        productFromRd(lines[i]?.rdStock ?? 0, {
+      ...defs.map((lp, i) =>
+        productFromRd(game.current.lines?.[i]?.rdStock ?? 0, {
           ...p,
           rdCostReductionMax: lp.rdCostReductionMax ?? p.rdCostReductionMax,
           rdDemandBoostMax: lp.rdDemandBoostMax ?? p.rdDemandBoostMax,

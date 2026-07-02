@@ -10,12 +10,15 @@ import type {
   ProductLineState,
   LineDecision,
   LineResult,
+  DevInProgress,
+  DevLaunched,
 } from '@core/types'
 import { demandAt } from '@core/market/demand'
 import { productFromRd } from '@core/product/research'
 import { assessCredit } from '@core/finance/credit'
 import { productionCapacity, laborCapacity, costEfficiency } from '@core/finance/capacity'
 import { sharesIssued } from '@core/finance/shares'
+import { composeLineDefs, findDevProject, developmentAssetOf } from '@core/product/dev'
 
 /** 0..1 にクランプ。 */
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
@@ -92,19 +95,9 @@ export function resolveTurn(
   const apBegin = bs.currentLiabilities.accountsPayable
 
   // === 製品ライン（複数製品）。lines が真実源＝単一製品も「1ラインのループ」として同じ経路を通る ===
-  // ライン定義: 未指定シナリオは従来パラメータの単一ライン。
-  const lineDefs: ProductLineParams[] = params.productLines?.length
-    ? params.productLines
-    : [
-        {
-          id: 'main',
-          name: '主力製品',
-          baseDemand: params.baseDemand,
-          basePrice: params.basePrice,
-          priceElasticity: params.priceElasticity,
-          unitVariableCost: params.unitVariableCost,
-        },
-      ]
+  // ライン定義: composeLineDefs が唯一のソース（シナリオ定義＋商材開発でローンチ済みの新ライン、
+  // upgrade の需要ブースト×lifecycle を合成）。期首状態から決定論的に導出＝プレビューと確定が一致。
+  const lineDefs: ProductLineParams[] = composeLineDefs(params, state, state.turn)
   // ライン状態: 未保持（従来セーブ・初期状態）はライン0にスカラー在庫/累積R&Dを包む（移行不要の後方互換）。
   const linesBegin: ProductLineState[] = lineDefs.map((_, i) => {
     const held = state.lines?.[i]
@@ -268,6 +261,59 @@ export function resolveTurn(
   const spotCost = lineResults[0]?.effectiveUnitCost ?? 0
   const product = works[0]?.lineProduct ?? productFromRd(state.rdStock, params)
 
+  // === 商材開発（開発費の資産計上/費用処理・無形資産の償却・自動ローンチ） ===
+  // 会計: capitalize=true は 現金↓＝開発資産↑（投資CF・P/L無傷）→ 完成後に毎期償却（のれん同型）。
+  //       capitalize=false（カフェのメニュー等）は即・販管費＝費用処理（資産化との対比が学び）。
+  const devFeature = (params.devProjects?.length ?? 0) > 0
+  // ① 償却（期首のローンチ済み資産。簿価が小さくなっても最低1円/期で必ず償却し切る）。
+  let devAmortized = 0
+  const devLaunchedAfterAmort: DevLaunched[] = (state.devLaunched ?? []).map((d) => {
+    const proj = findDevProject(params, d.projectId)
+    if (!proj?.capitalize || d.bookValue <= 0 || !proj.amortRate) return { ...d }
+    const amort = Math.min(d.bookValue, Math.max(1, Math.round(d.bookValue * proj.amortRate * periodFactor)))
+    devAmortized += amort
+    return { ...d, bookValue: d.bookValue - amort }
+  })
+  // ② 当期の開発投資（プロジェクトごとに「残り必要額」でクランプ＝現金の無限パーキングを防ぐ）。
+  let devCapitalized = 0
+  let devExpensed = 0
+  const devWipAfterSpend: DevInProgress[] = (state.devInProgress ?? []).map((w) => ({ ...w }))
+  if (devFeature && decision.devSpend) {
+    for (const [pid, raw] of Object.entries(decision.devSpend)) {
+      const proj = findDevProject(params, pid)
+      if (!proj) continue
+      if (devLaunchedAfterAmort.some((d) => d.projectId === pid)) continue // 完成済みは再開発しない
+      const cur = devWipAfterSpend.find((w) => w.projectId === pid)
+      const invested = cur?.invested ?? 0
+      const spend = Math.min(Math.max(0, Math.round(raw)), Math.max(0, proj.requiredInvestment - invested))
+      if (spend <= 0) continue
+      if (proj.capitalize) devCapitalized += spend
+      else devExpensed += spend
+      if (cur) cur.invested += spend
+      else devWipAfterSpend.push({ projectId: pid, invested: spend, startedTurn: state.turn })
+    }
+  }
+  // ③ 完成判定（期末）: 必要額＋最短期間の到達で自動ローンチ。効果は翌期から（M&A と同じ期末反映）。
+  //    振替は同一 B/S 科目（開発資産）内＝B/S は動かない。費用処理案件の簿価は 0（資産が無いので償却も無い）。
+  const launchedProjectIds: string[] = []
+  const devWipEnd: DevInProgress[] = []
+  const devLaunchedEnd: DevLaunched[] = [...devLaunchedAfterAmort]
+  for (const w of devWipAfterSpend) {
+    const proj = findDevProject(params, w.projectId)
+    const elapsed = state.turn - w.startedTurn + 1
+    if (proj && w.invested >= proj.requiredInvestment && elapsed >= proj.minTurns) {
+      launchedProjectIds.push(w.projectId)
+      devLaunchedEnd.push({
+        projectId: w.projectId,
+        launchedTurn: state.turn + 1,
+        bookValue: proj.capitalize ? w.invested : 0,
+      })
+    } else {
+      devWipEnd.push(w)
+    }
+  }
+  const devAssetEnd = developmentAssetOf(params, { devInProgress: devWipEnd, devLaunched: devLaunchedEnd })
+
   // --- 損益計算書（P/L） ---
   const grossProfit = revenue - costOfGoodsSold
   // 固定費（物価で増減）・減価償却は年額を期間でスケール。
@@ -303,7 +349,9 @@ export function resolveTurn(
     hiringCost +
     severanceCost +
     listingCostNow +
-    goodwillAmort
+    goodwillAmort +
+    devExpensed + // 費用処理の開発費（カフェのメニュー等）
+    devAmortized // 開発資産の償却（非現金・営業CFで足し戻す）
   const operatingIncome = grossProfit - operatingExpenses
 
   // 実効金利＝政策金利（マクロ）＋銀行スプレッド＋信用スプレッド（期首の財務状態で評価）。
@@ -448,11 +496,13 @@ export function resolveTurn(
   const acquisitionConsideration = acqCash + acqDebt + acqStock
   const acquiredNow = state.acquiredCompetitor === true || acquisitionConsideration > 0
 
-  // 非現金の設備減（減価償却＋設備毀損）とのれん償却を足し戻す。保険補償分の現金は netIncome 経由で流入。
+  // 非現金の設備減（減価償却＋設備毀損）・のれん償却・開発資産の償却を足し戻す
+  // （devAmortized は nonCashEquipReduction と分離＝設備簿価の減額と混ぜない。二重控除の回避）。
   const nonCashEquipReduction = depreciation + equipmentWritedown
-  const operating = netIncome + nonCashEquipReduction + goodwillAmort - deltaAR - deltaInventory + deltaAP
-  // 買収に支払った現金（自己資金＋借入分）は投資CF、借入の調達は財務CF ＝ 現金純減は自己資金分だけ。
-  const investing = -capex - (acqCash + acqDebt)
+  const operating =
+    netIncome + nonCashEquipReduction + goodwillAmort + devAmortized - deltaAR - deltaInventory + deltaAP
+  // 買収に支払った現金（自己資金＋借入分）と資産計上した開発投資は投資CF。
+  const investing = -capex - devCapitalized - (acqCash + acqDebt)
   const financingCF = financing + equityIssue + ipoProceeds + acqDebt - dividendPaid // 借入＋増資＋IPO＋買収借入−配当
   const netChange = operating + investing + financingCF
   const cashEnd = cashBegin + netChange
@@ -506,6 +556,9 @@ export function resolveTurn(
     listed: listedNow ? true : undefined,
     // 競合買収ステータス（成立で true・以後シェア争い消滅＋需要ブースト）。
     acquiredCompetitor: acquiredNow ? true : undefined,
+    // 商材開発の状態（devProjects のあるシナリオでのみ書く。空なら undefined＝セーブ後方互換）。
+    devInProgress: devFeature && devWipEnd.length > 0 ? devWipEnd : undefined,
+    devLaunched: devFeature && devLaunchedEnd.length > 0 ? devLaunchedEnd : undefined,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,
@@ -520,6 +573,9 @@ export function resolveTurn(
           bs.fixedAssets.goodwill == null && acqGoodwill === 0
             ? undefined
             : goodwillBegin - goodwillAmort + acqGoodwill,
+        // 開発資産＝Σ(仕掛の累計投資)＋Σ(無形資産の残存簿価) の導出値。未保有なら undefined のまま。
+        developmentAsset:
+          bs.fixedAssets.developmentAsset == null && devAssetEnd === 0 ? undefined : devAssetEnd,
       },
       currentLiabilities: {
         accountsPayable: apEnd,
@@ -556,6 +612,10 @@ export function resolveTurn(
     ipoProceeds,
     goodwillAmortized: goodwillAmort,
     acquisitionConsideration,
+    devCapitalized,
+    devExpensed,
+    devAmortized,
+    launchedProjectIds,
     lineResults,
     shockOneOffLoss: oneOffLoss,
     shockEquipmentWritedown: equipmentWritedown,

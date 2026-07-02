@@ -15,6 +15,9 @@ export type {
   ProductLineState,
   LineDecision,
   LineResult,
+  DevProject,
+  DevInProgress,
+  DevLaunched,
   Goal,
   GoalStatus,
 } from './types'
@@ -28,6 +31,7 @@ export { breakEven, type BreakEven } from './finance/breakeven'
 export { bookValuePerShare, sharesIssued, earningsPerShare } from './finance/shares'
 export { ipoValuation, ipoOfferPrice, canIPO, type IpoGate } from './finance/ipo'
 export { productFromRd } from './product/research'
+export { composeLineDefs, devLifecycleFactor, findDevProject, developmentAssetOf } from './product/dev'
 export { materialIndexNext } from './market/material'
 export { competitorAt, shareMultiplier, marketShare, type Competitor } from './market/competitor'
 export {

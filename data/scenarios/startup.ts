@@ -76,6 +76,44 @@ export const startupScenario: Scenario = {
     listingDemandBoost: 0.15, // 上場の知名度で需要+15%
     ipoEquityThreshold: 1_000_000,
     ipoProfitablePeriods: 6,
+    // 商材開発（IT＝ソフトウェアの資産計上→速い償却・速い陳腐化）
+    devProjects: [
+      {
+        id: 'newsvc',
+        name: '新サービスの開発',
+        description: '第二のサービス。完成で新ラインが増えるが、技術は速く陳腐化する（資産計上→償却）。',
+        kind: 'new',
+        requiredInvestment: 480_000,
+        minTurns: 6,
+        capitalize: true,
+        amortRate: 0.25, // 4年で償却（ソフトウェアは速い）
+        lifecycle: 'decay',
+        obsolescenceRate: 0.15, // 需要は年15%で陳腐化＝継続開発が必要
+        newLine: {
+          id: 'svc2',
+          name: '新サービス',
+          baseDemand: 120,
+          basePrice: 6_000,
+          priceElasticity: 0.8,
+          unitVariableCost: 600,
+          rdDemandBoostMax: 0.8,
+        },
+      },
+      {
+        id: 'bigfeature',
+        name: '大型機能アップデート',
+        description: '主力サービスの大型機能。需要を押し上げるが効果は陳腐化していく（資産計上→償却）。',
+        kind: 'upgrade',
+        targetLineId: 'main',
+        requiredInvestment: 300_000,
+        minTurns: 4,
+        capitalize: true,
+        amortRate: 0.3,
+        lifecycle: 'decay',
+        obsolescenceRate: 0.2,
+        demandBoost: 0.25,
+      },
+    ],
     // M&A（競合スタートアップの吸収＝アクハイヤー含む）
     acqTargetNetAssets: 200_000, // 受入純資産＝サーバー・開発環境
     acqTargetHeadcount: 2, // エンジニア2人を受け入れ

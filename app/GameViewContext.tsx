@@ -1,5 +1,13 @@
 import { createContext, useContext } from 'react'
-import type { Decision, TurnResult, CreditInfo, Competitor, ProductState, IpoGate } from '@core/index'
+import type {
+  Decision,
+  TurnResult,
+  CreditInfo,
+  Competitor,
+  ProductState,
+  IpoGate,
+  ProductLineParams,
+} from '@core/index'
 import type { Scenario } from '@data/scenarios'
 import type { GameState } from './state'
 
@@ -23,6 +31,8 @@ export interface GameView {
   play: (d: Decision) => void
 
   // --- 派生した経済量 ---
+  /** 実効ライン構成（シナリオ定義＋商材開発でローンチ済みの新ライン。composeLineDefs 由来の唯一のソース） */
+  lineDefs: ProductLineParams[]
   equity: number
   product: ProductState
   spotCost: number

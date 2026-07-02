@@ -91,6 +91,44 @@ export const defaultScenario: Scenario = {
     listingDemandBoost: 0.12, // 上場の知名度で需要+12%（能力を広げてこそ効く＝再投資の学び）
     ipoEquityThreshold: 1_000_000, // 純資産100万円以上
     ipoProfitablePeriods: 6, // 直近6ヶ月連続黒字
+    // 商材開発（開発費の資産計上→無形資産→償却 を学ぶ。製造業＝新製品と設計改良）
+    devProjects: [
+      {
+        id: 'custom',
+        name: '特注品ラインの開発',
+        description: '法人向け特注品。完成すると新しい製品ラインが増える（開発費は資産計上→償却）。',
+        kind: 'new',
+        requiredInvestment: 360_000,
+        minTurns: 6,
+        capitalize: true,
+        amortRate: 0.15, // 約7年で償却
+        lifecycle: 'decay',
+        obsolescenceRate: 0.06, // 需要は年6%で緩やかに陳腐化
+        newLine: {
+          id: 'custom',
+          name: '特注品',
+          baseDemand: 96,
+          basePrice: 3_600,
+          priceElasticity: 0.8,
+          unitVariableCost: 1_800,
+          rdDemandBoostMax: 0.6,
+        },
+      },
+      {
+        id: 'std-v2',
+        name: '標準品の設計改良（v2）',
+        description: '標準品の再設計。需要とR&Dの伸びしろが上がる（開発費は資産計上→償却）。',
+        kind: 'upgrade',
+        targetLineId: 'std',
+        requiredInvestment: 240_000,
+        minTurns: 4,
+        capitalize: true,
+        amortRate: 0.2, // 5年で償却
+        lifecycle: 'permanent',
+        demandBoost: 0.1,
+        rdDemandBoostMaxDelta: 0.15,
+      },
+    ],
     // M&A（同業の町工場を買収して競合を消す）
     acqTargetNetAssets: 300_000, // 受入純資産＝ターゲットの設備簿価
     acqTargetHeadcount: 3, // 職人3人を受け入れ

@@ -111,6 +111,13 @@ function StatementsViewImpl({ state, last, periodsPerYear, history }: Props) {
           {(bs.fixedAssets.goodwill ?? 0) > 0 && (
             <Row label="のれん" value={bs.fixedAssets.goodwill ?? 0} term="のれん" />
           )}
+          {(bs.fixedAssets.developmentAsset ?? 0) > 0 && (
+            <Row
+              label="開発資産（仕掛＋無形）"
+              value={bs.fixedAssets.developmentAsset ?? 0}
+              term="開発費の資産計上"
+            />
+          )}
           <Row label="資産合計" value={totalAssets(bs)} kind="total" />
           <tr className="section"><th colSpan={2}>負債・純資産の部</th></tr>
           <Row label="買掛金" value={bs.currentLiabilities.accountsPayable} term="買掛金" />

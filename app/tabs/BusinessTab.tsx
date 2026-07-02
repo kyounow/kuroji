@@ -1,5 +1,6 @@
 import { useGameView } from '../GameViewContext'
 import { DecisionPanel } from '../components/DecisionPanel'
+import { DevPanel } from '../components/DevPanel'
 import { ForecastPanel } from '../components/ForecastPanel'
 import { InfoTip } from '../components/Glossary'
 import { yen, pct, num } from '../format'
@@ -37,8 +38,8 @@ export function BusinessTab() {
             <div className="metric-value">{yen(v.spotCost)}</div>
             <div className="metric-label">
               原材料スポット単価/個
-              {(params.productLines?.length ?? 0) > 1
-                ? `（${params.productLines![0].name}。他ラインは下表）`
+              {v.lineDefs.length > 1
+                ? `（${v.lineDefs[0].name}。他ラインは下表）`
                 : `（基準 ${yen(params.unitVariableCost)}）`}
             </div>
           </div>
@@ -96,7 +97,7 @@ export function BusinessTab() {
             </div>
           )}
         </div>
-        {(params.productLines?.length ?? 0) > 1 && game.current.lines && (
+        {v.lineDefs.length > 1 && game.current.lines && (
           <div className="table-scroll">
             <table className="history">
               <thead>
@@ -109,9 +110,15 @@ export function BusinessTab() {
                 </tr>
               </thead>
               <tbody>
-                {params.productLines!.map((lp, i) => {
-                  const l = game.current.lines![i]
-                  if (!l) return null
+                {v.lineDefs.map((lp, i) => {
+                  // ローンチ直後の新ラインは lines[i] が未生成のことがある（翌期に生成）→ 空の在庫で表示。
+                  const l = game.current.lines![i] ?? {
+                    materialUnits: 0,
+                    materialValue: 0,
+                    finishedUnits: 0,
+                    finishedValue: 0,
+                    rdStock: 0,
+                  }
                   return (
                     <tr key={lp.id}>
                       <td>{lp.name}</td>
@@ -160,9 +167,11 @@ export function BusinessTab() {
         sharesOutstanding={game.current.sharesOutstanding}
         equityIssueCap={v.equityIssueCap}
         dividendCap={v.dividendCap}
-        productLines={params.productLines}
+        productLines={v.lineDefs.length > 1 ? v.lineDefs : undefined}
         warnings={v.warnings}
       />
+
+      {(params.devProjects?.length ?? 0) > 0 && <DevPanel />}
 
       {v.ipoAllowed && !gameOver && (
         <section className="panel">

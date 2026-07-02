@@ -511,6 +511,121 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(balances(r.state.balanceSheet)).toBe(true)
   })
 
+  it('商材開発: 資産計上は 現金↓＝開発資産↑（投資CF・P/L無傷）で恒等式維持', () => {
+    const { initialState, params } = base()
+    const p: SimParams = {
+      ...params,
+      devProjects: [
+        { id: 'd1', name: '新製品', kind: 'new', requiredInvestment: 300_000, minTurns: 6, capitalize: true, amortRate: 0.2, lifecycle: 'permanent', newLine: { id: 'nl', name: '新製品', baseDemand: 600, basePrice: 3000, priceElasticity: 1, unitVariableCost: 1200 } },
+      ],
+    }
+    const withDev = resolveTurn(initialState, decide({ produceUnits: 0, devSpend: { d1: 120_000 } }), p)
+    const without = resolveTurn(initialState, decide({ produceUnits: 0 }), p)
+    expect(withDev.devCapitalized).toBe(120_000)
+    expect(withDev.state.devInProgress).toEqual([{ projectId: 'd1', invested: 120_000, startedTurn: 0 }])
+    expect(withDev.state.balanceSheet.fixedAssets.developmentAsset).toBe(120_000)
+    // P/L 無傷（費用にならない）・投資CFに出る・現金は同額減
+    expect(withDev.incomeStatement.operatingExpenses).toBe(without.incomeStatement.operatingExpenses)
+    expect(withDev.cashFlow.investing - without.cashFlow.investing).toBe(-120_000)
+    expect(withDev.cashFlow.cashEnd - without.cashFlow.cashEnd).toBe(-120_000)
+    expect(balances(withDev.state.balanceSheet)).toBe(true)
+    // クランプ: 必要額を超える投資は積めない
+    const over = resolveTurn(initialState, decide({ produceUnits: 0, devSpend: { d1: 9_999_999 } }), p)
+    expect(over.devCapitalized).toBe(300_000)
+    expect(balances(over.state.balanceSheet)).toBe(true)
+  })
+
+  it('商材開発: 費用処理（capitalize=false）は販管費に計上され資産は増えない', () => {
+    const { initialState, params } = base()
+    const p: SimParams = {
+      ...params,
+      devProjects: [
+        { id: 'menu', name: '定番メニュー', kind: 'upgrade', targetLineId: 'main', demandBoost: 0.15, requiredInvestment: 100_000, minTurns: 2, capitalize: false, lifecycle: 'permanent' },
+      ],
+    }
+    const withDev = resolveTurn(initialState, decide({ produceUnits: 0, devSpend: { menu: 40_000 } }), p)
+    const without = resolveTurn(initialState, decide({ produceUnits: 0 }), p)
+    expect(withDev.devExpensed).toBe(40_000)
+    expect(withDev.incomeStatement.operatingExpenses - without.incomeStatement.operatingExpenses).toBe(40_000)
+    expect(withDev.cashFlow.investing).toBe(without.cashFlow.investing) // 投資CFには出ない
+    expect(withDev.state.balanceSheet.fixedAssets.developmentAsset ?? 0).toBe(0)
+    expect(balances(withDev.state.balanceSheet)).toBe(true)
+  })
+
+  it('商材開発: 必要額＋最短期間の到達で自動ローンチ（効果は翌期から・新ラインが増える）', () => {
+    const { initialState, params } = base()
+    const p: SimParams = {
+      ...params,
+      devProjects: [
+        { id: 'd1', name: '新製品', kind: 'new', requiredInvestment: 200_000, minTurns: 1, capitalize: true, amortRate: 0.24, lifecycle: 'permanent', newLine: { id: 'nl', name: '新製品', baseDemand: 1200, basePrice: 3000, priceElasticity: 1, unitVariableCost: 1200 } },
+      ],
+    }
+    // 1期で必要額到達 → 期末に完成（launchedTurn=翌期）・当期のライン構成は変わらない
+    const t0 = resolveTurn(initialState, decide({ produceUnits: 0, devSpend: { d1: 200_000 } }), p)
+    expect(t0.launchedProjectIds).toEqual(['d1'])
+    expect(t0.lineResults).toHaveLength(1)
+    expect(t0.state.devInProgress).toBeUndefined()
+    expect(t0.state.devLaunched).toEqual([{ projectId: 'd1', launchedTurn: 1, bookValue: 200_000 }])
+    expect(t0.state.balanceSheet.fixedAssets.developmentAsset).toBe(200_000) // 仕掛→無形の振替＝B/S不動
+    expect(balances(t0.state.balanceSheet)).toBe(true)
+    // 翌期: 新ラインが構成に現れ、販売できる
+    const t1 = resolveTurn(
+      t0.state,
+      decide({
+        lines: [
+          { unitPrice: 2_000, purchaseMaterials: 0, produceUnits: 0, marketingSpend: 0, rdSpend: 0 },
+          { unitPrice: 3000, purchaseMaterials: 50, produceUnits: 50, marketingSpend: 0, rdSpend: 0 },
+        ],
+      }),
+      p,
+    )
+    expect(t1.lineResults).toHaveLength(2)
+    expect(t1.lineResults[1].unitsSold).toBeGreaterThan(0)
+    expect(balances(t1.state.balanceSheet)).toBe(true)
+    // minTurns 未達なら完成しない
+    const slow: SimParams = { ...p, devProjects: [{ ...p.devProjects![0], minTurns: 3 }] }
+    const s0 = resolveTurn(initialState, decide({ produceUnits: 0, devSpend: { d1: 200_000 } }), slow)
+    expect(s0.launchedProjectIds).toEqual([])
+    expect(s0.state.devInProgress).toHaveLength(1)
+  })
+
+  it('商材開発: 無形資産は毎期償却（販管費↑・非現金）され、恒等式を保つ', () => {
+    const { initialState, params } = base()
+    const p: SimParams = {
+      ...params,
+      devProjects: [
+        { id: 'd1', name: 'ソフト', kind: 'new', requiredInvestment: 240_000, minTurns: 1, capitalize: true, amortRate: 0.5, lifecycle: 'permanent', newLine: { id: 'nl', name: 'ソフト', baseDemand: 0, basePrice: 3000, priceElasticity: 1, unitVariableCost: 1200 } },
+      ],
+    }
+    const launched: CompanyState = {
+      ...initialState,
+      devLaunched: [{ projectId: 'd1', launchedTurn: 0, bookValue: 240_000 }],
+      balanceSheet: {
+        ...initialState.balanceSheet,
+        fixedAssets: { ...initialState.balanceSheet.fixedAssets, developmentAsset: 240_000 },
+        currentAssets: { ...initialState.balanceSheet.currentAssets, cash: initialState.balanceSheet.currentAssets.cash - 240_000 },
+      },
+    }
+    expect(balances(launched.balanceSheet)).toBe(true)
+    const r = resolveTurn(launched, decide({ produceUnits: 0 }), p)
+    const noDev = resolveTurn(initialState, decide({ produceUnits: 0 }), p)
+    // 月次償却 = round(240,000 × 0.5 / 12) = 10,000
+    expect(r.devAmortized).toBe(10_000)
+    expect(r.state.devLaunched?.[0].bookValue).toBe(230_000)
+    expect(r.state.balanceSheet.fixedAssets.developmentAsset).toBe(230_000)
+    expect(r.incomeStatement.operatingExpenses - noDev.incomeStatement.operatingExpenses).toBe(10_000)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('商材開発: devProjects の無いシナリオでは dev フィールドを一切書かない（後方互換）', () => {
+    const { initialState, params } = base()
+    const r = resolveTurn(initialState, decide({ produceUnits: 0, devSpend: { ghost: 100_000 } }), params)
+    expect(r.devCapitalized).toBe(0)
+    expect(r.state.devInProgress).toBeUndefined()
+    expect(r.state.devLaunched).toBeUndefined()
+    expect(r.state.balanceSheet.fixedAssets.developmentAsset).toBeUndefined()
+  })
+
   it('株式未設定のシナリオは増資0で sharesOutstanding を未設定のまま保つ（後方互換）', () => {
     const { initialState, params } = base()
     // initialState は sharesOutstanding を持たない（undefined）

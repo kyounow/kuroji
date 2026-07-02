@@ -12,6 +12,7 @@ import {
   costEfficiency,
   canIPO,
   ipoValuation,
+  composeLineDefs,
 } from '@core/index'
 import { useGame, previewTurn, shockRiskFor, defaultDecision } from './state'
 import { EventBanner } from './components/EventBanner'
@@ -149,6 +150,12 @@ export function App() {
     })
   }, [game, gameOver, score])
 
+  // 実効ライン構成（シナリオ定義＋商材開発でローンチ済みの新ライン）。UIとエンジンの唯一のソース。
+  const lineDefs = useMemo(
+    () => composeLineDefs(scenario.params, game.current, game.current.turn),
+    [scenario.params, game],
+  )
+
   // 現在の累積R&Dから決まる製品パラメータ（次の期に適用される）。
   const product = productFromRd(game.current.rdStock, scenario.params)
   // 当期の原材料スポット単価（市況指数 × R&D 原価改善 × 設備の規模の経済）。
@@ -262,6 +269,7 @@ export function App() {
     decision,
     patch,
     play,
+    lineDefs,
     equity,
     product,
     spotCost,

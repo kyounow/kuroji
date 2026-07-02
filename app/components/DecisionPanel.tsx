@@ -173,16 +173,21 @@ export function DecisionPanel({
     'marketingSpend',
     'rdSpend',
   ])
+  // エンジン（resolveTurn の lineDecs）と同一のフォールバック式＝表示と実際の挙動を常に一致させる。
+  // decision.lines が無い/短い（新商材ローンチ直後等）とき: ライン0=スカラー判断・他ライン=休止。
+  const lineFallback = (lp: ProductLineParams, i: number): LineDecision =>
+    i === 0
+      ? {
+          unitPrice: decision.unitPrice,
+          purchaseMaterials: decision.purchaseMaterials,
+          produceUnits: decision.produceUnits,
+          marketingSpend: decision.marketingSpend,
+          rdSpend: decision.rdSpend,
+        }
+      : { unitPrice: lp.basePrice, purchaseMaterials: 0, produceUnits: 0, marketingSpend: 0, rdSpend: 0 }
   const patchLine = (i: number, p: Partial<LineDecision>) => {
-    const base: LineDecision[] =
-      decision.lines ??
-      (productLines ?? []).map((lp) => ({
-        unitPrice: lp.basePrice,
-        purchaseMaterials: 0,
-        produceUnits: 0,
-        marketingSpend: 0,
-        rdSpend: 0,
-      }))
+    const defs = productLines ?? []
+    const base: LineDecision[] = defs.map((lp, j) => decision.lines?.[j] ?? lineFallback(lp, j))
     const next = base.map((l, j) => (j === i ? { ...l, ...p } : l))
     onChange({ lines: next })
   }
@@ -249,13 +254,7 @@ export function DecisionPanel({
       )}
       {isMultiLine &&
         (productLines ?? []).map((lp, i) => {
-          const line = decision.lines?.[i] ?? {
-            unitPrice: lp.basePrice,
-            purchaseMaterials: 0,
-            produceUnits: 0,
-            marketingSpend: 0,
-            rdSpend: 0,
-          }
+          const line = decision.lines?.[i] ?? lineFallback(lp, i)
           return (
             <fieldset key={lp.id} className="choice-group line-group">
               <legend>🏷 {lp.name}</legend>

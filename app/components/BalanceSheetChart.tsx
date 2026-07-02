@@ -17,6 +17,8 @@ export function BalanceSheetChart({ bs }: { bs: BalanceSheet }) {
     { label: '設備', value: bs.fixedAssets.equipment, color: '#b5e0d3' },
     // のれん（M&A後のみ非0。恒等式の左辺に含める）
     { label: 'のれん', value: bs.fixedAssets.goodwill ?? 0, color: '#d4c08f' },
+    // 開発資産（商材開発の仕掛＋無形。開発中のみ非0）
+    { label: '開発資産', value: bs.fixedAssets.developmentAsset ?? 0, color: '#c3a6de' },
   ]
   const liabEquity: Segment[] = [
     { label: '買掛金', value: bs.currentLiabilities.accountsPayable, color: '#e0875a' },

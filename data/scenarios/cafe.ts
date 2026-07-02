@@ -74,6 +74,34 @@ export const cafeScenario: Scenario = {
     rdCostReductionMax: 0.2,
     rdDemandBoostMax: 0.6,
     rdHalf: 200_000,
+    // 商材開発（カフェ＝メニュー開発。レシピは資産にならない＝費用処理。製造/ITの資産計上との対比が学び）
+    devProjects: [
+      {
+        id: 'signature',
+        name: '定番メニューの開発',
+        description: '看板フードメニュー。効果はずっと続く（開発費はその期の費用＝資産にならない）。',
+        kind: 'upgrade',
+        targetLineId: 'food',
+        requiredInvestment: 90_000,
+        minTurns: 3,
+        capitalize: false,
+        lifecycle: 'permanent',
+        demandBoost: 0.15,
+      },
+      {
+        id: 'seasonal',
+        name: '季節限定メニュー',
+        description: '旬の限定ドリンク。6ヶ月だけ需要を大きく押し上げて終了（費用処理）。',
+        kind: 'upgrade',
+        targetLineId: 'drink',
+        requiredInvestment: 45_000,
+        minTurns: 2,
+        capitalize: false,
+        lifecycle: 'seasonal',
+        boostDuration: 6,
+        demandBoost: 0.3,
+      },
+    ],
     // M&A（近所のライバル店を買収して常連客ごと受け入れる）
     acqTargetNetAssets: 250_000, // 受入純資産＝店舗・厨房設備
     acqTargetHeadcount: 4, // スタッフ4人を受け入れ

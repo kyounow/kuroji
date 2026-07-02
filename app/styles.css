@@ -1289,6 +1289,40 @@ table.history tbody tr[tabindex] {
   padding: 0 0.35rem;
 }
 
+/* 商材開発パネル */
+.dev-projects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.dev-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  background: var(--bg);
+}
+
+.dev-card.wip {
+  border-color: var(--accent);
+}
+
+.dev-card.done {
+  opacity: 0.85;
+}
+
+.dev-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.25rem;
+}
+
+.dev-bar {
+  margin: 0.35rem 0;
+}
+
 /* 達成バッジ（実績） */
 .badges {
   display: grid;

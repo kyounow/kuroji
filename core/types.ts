@@ -17,6 +17,11 @@ export interface BalanceSheet {
     equipment: number
     /** のれん（M&A の取得価額−受入純資産）。毎期償却。未設定は 0。 */
     goodwill?: number
+    /**
+     * 開発資産（商材開発の 仕掛＝開発仮勘定 ＋ 完成後の無形資産簿価）。
+     * Σ(devInProgress.invested) + Σ(devLaunched.bookValue) の導出値としてエンジンが毎期書く。未設定は 0。
+     */
+    developmentAsset?: number
   }
   /** 流動負債（買掛金・短期借入 など） */
   currentLiabilities: {
@@ -82,6 +87,10 @@ export interface CompanyState {
    * 未設定（従来セーブ・単一製品）はエンジン入口でライン0に包んで処理する（後方互換・移行不要）。
    */
   lines?: ProductLineState[]
+  /** 進行中の商材開発（WIP＝開発仮勘定）。devProjects のあるシナリオでのみ書かれる。 */
+  devInProgress?: DevInProgress[]
+  /** ローンチ済みの商材開発（効果有効・無形資産の償却中）。 */
+  devLaunched?: DevLaunched[]
 }
 
 /** 製品ラインの定義（複数製品）。未指定シナリオは従来の単一製品（SimParams 直下の値）で動く。 */
@@ -116,6 +125,62 @@ export interface LineDecision {
   produceUnits: number
   marketingSpend: number
   rdSpend: number
+}
+
+/**
+ * 商材開発プロジェクトの定義（シナリオが供給）。
+ * capitalize=true: 開発費を「開発資産」に資産計上（現金↓・資産↑＝投資CF・P/L無傷）し、完成後に毎期償却（製造/IT）。
+ * capitalize=false: 開発費は即・販管費＝費用処理（カフェのメニュー開発。資産化との対比が学び）。
+ */
+export interface DevProject {
+  id: string
+  /** 表示名（例: 特注品ライン／新サービス／季節限定メニュー） */
+  name: string
+  /** 学習向けの一言説明 */
+  description?: string
+  /** new=新しい製品ラインを生む／upgrade=既存ラインを強化 */
+  kind: 'new' | 'upgrade'
+  /** 完成に必要な累計開発投資（投資はここまででクランプ＝積みすぎ不可） */
+  requiredInvestment: number
+  /** 完成までの最短期間（開発開始からのターン数） */
+  minTurns: number
+  /** true=資産計上→償却。false=即費用 */
+  capitalize: boolean
+  /** 無形資産の年間償却率（capitalize=true のとき。例 0.2 = 5年で償却） */
+  amortRate?: number
+  /** 効果の寿命: decay=じわ減り（陳腐化）/ permanent=恒久 / seasonal=期間限定 */
+  lifecycle: 'decay' | 'permanent' | 'seasonal'
+  /** decay: 年間の陳腐化率（例 0.15 = 需要が年15%逓減） */
+  obsolescenceRate?: number
+  /** seasonal: 効果が続くターン数（終了で効果消滅） */
+  boostDuration?: number
+  /** kind=new: 生まれる製品ライン */
+  newLine?: ProductLineParams
+  /** kind=upgrade: 対象ラインID */
+  targetLineId?: string
+  /** kind=upgrade: 対象ラインの基準需要ブースト（例 0.15 = +15%） */
+  demandBoost?: number
+  /** kind=upgrade: 対象ラインの R&D 上限の引き上げ（係数に加算） */
+  rdCostReductionMaxDelta?: number
+  rdDemandBoostMaxDelta?: number
+}
+
+/** 進行中の開発案件（WIP＝開発仮勘定）。 */
+export interface DevInProgress {
+  projectId: string
+  /** 累計投資額（requiredInvestment でクランプ） */
+  invested: number
+  /** 開発を開始した（最初に投資した）ターン */
+  startedTurn: number
+}
+
+/** 完成（ローンチ）済みの開発案件。効果は launchedTurn から有効。 */
+export interface DevLaunched {
+  projectId: string
+  /** 効果が有効になったターン（完成判定の翌期＝M&A と同じ期末反映） */
+  launchedTurn: number
+  /** 無形資産の残存簿価（capitalize=true のみ。毎期償却で減る。整数） */
+  bookValue: number
 }
 
 /** ライン別のターン結果（UI 表示・診断用）。 */
@@ -186,6 +251,11 @@ export interface Decision {
    * 未指定なら従来のスカラー判断（unitPrice 等）をライン0に適用し、他ラインは休止。
    */
   lines?: LineDecision[]
+  /**
+   * 商材開発への当期投資（projectId → 金額）。最初の投資で開発が始まり、
+   * 累計が requiredInvestment に達し minTurns を満たすと自動で完成（翌期から効果）。
+   */
+  devSpend?: Record<string, number>
 }
 
 /** 市況イベント（需要乗数のほか、突発ショックの損失を持てる）。 */
@@ -310,6 +380,14 @@ export interface TurnResult {
   goodwillAmortized: number
   /** 当期の買収対価合計（不成立なら 0） */
   acquisitionConsideration: number
+  /** 当期に資産計上した開発投資（投資CF） */
+  devCapitalized: number
+  /** 当期に費用処理した開発投資（カフェ等・販管費） */
+  devExpensed: number
+  /** 当期の開発資産の償却額（非現金・営業CFで足し戻し） */
+  devAmortized: number
+  /** 当期末に完成（翌期から効果）したプロジェクトID */
+  launchedProjectIds: string[]
   /** 当期に算出された一時損失（保険前 gross。floor/cap/severity 適用後。バナーの見込み額に使う） */
   shockOneOffLoss: number
   /** 当期に算出された設備毀損（保険前 gross。簿価クリップ後。バナーの見込み額に使う） */
@@ -446,6 +524,10 @@ export interface SimParams {
   // --- 複数製品ライン（未指定は単一製品＝上記の baseDemand/basePrice 等をそのまま使用） ---
   /** 製品ラインの定義。2本以上で複数製品モード（UI もライン別入力になる）。 */
   productLines?: ProductLineParams[]
+
+  // --- 商材開発（未指定のシナリオでは開発不可） ---
+  /** 開発できる商材プロジェクトの定義。 */
+  devProjects?: DevProject[]
 
   // --- M&A（競合の買収。未設定のシナリオでは買収不可） ---
   /** 買収ターゲットの受入純資産（＝受け入れる設備の簿価。対価との差がのれんになる） */
