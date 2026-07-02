@@ -99,8 +99,16 @@ function randomDecision(game: GameState, params: SimParams, seed: number, turn: 
       : u(seed, turn, 13) < 0.2
         ? Math.round((u(seed, turn, 21) - 0.4) * 80000)
         : 0,
-    // IPO も稀に混ぜてストレス（ゲート未達なら engine が無視するのも含めて検証）。
+    // IPO・M&A も稀に混ぜてストレス（ゲート未達・対価不足なら engine が無視するのも含めて検証）。
     goPublic: sink && u(seed, turn, 23) < 0.04 ? { proceeds: Math.round(500000 * u(seed, turn, 24)) } : undefined,
+    acquire:
+      sink && u(seed, turn, 25) < 0.04
+        ? {
+            cashPaid: Math.round(400000 * u(seed, turn, 26)),
+            debtRaised: Math.round(300000 * u(seed, turn, 27)),
+            stockValue: Math.round(200000 * u(seed, turn, 28)),
+          }
+        : undefined,
   }
 }
 

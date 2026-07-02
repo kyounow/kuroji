@@ -1,9 +1,16 @@
 import type { BalanceSheet } from '@core/types'
 
-/** 資産合計（流動資産＋固定資産）。 */
+/** 資産合計（流動資産＋固定資産。のれんを含む）。 */
 export function totalAssets(bs: BalanceSheet): number {
   const { cash, accountsReceivable, rawMaterials, finishedGoods } = bs.currentAssets
-  return cash + accountsReceivable + rawMaterials + finishedGoods + bs.fixedAssets.equipment
+  return (
+    cash +
+    accountsReceivable +
+    rawMaterials +
+    finishedGoods +
+    bs.fixedAssets.equipment +
+    (bs.fixedAssets.goodwill ?? 0)
+  )
 }
 
 /** 負債合計（流動負債＋固定負債）。 */

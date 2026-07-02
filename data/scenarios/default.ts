@@ -85,6 +85,11 @@ export const defaultScenario: Scenario = {
     listingDemandBoost: 0.08, // 上場の知名度で需要+8%
     ipoEquityThreshold: 1_000_000, // 純資産100万円以上
     ipoProfitablePeriods: 6, // 直近6ヶ月連続黒字
+    // M&A（同業の町工場を買収して競合を消す）
+    acqTargetNetAssets: 300_000, // 受入純資産＝ターゲットの設備簿価
+    acqTargetHeadcount: 3, // 職人3人を受け入れ
+    acqTargetDemandBoost: 0.15, // 顧客基盤の獲得で需要+15%
+    goodwillAmortRate: 0.1, // のれんは10年で償却
     // マクロ経済
     inflationTarget: 0.02,
     policyNeutralRate: 0.01,
@@ -97,5 +102,5 @@ export const defaultScenario: Scenario = {
     target: 1_500_000,
     withinTurns: 96,
   },
-  enabledOneTimeActions: ['ipo'],
+  enabledOneTimeActions: ['ipo', 'ma'],
 }

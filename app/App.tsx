@@ -26,6 +26,7 @@ import { CapitalPanel } from './components/CapitalPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SettingsModal } from './components/SettingsModal'
 import { IPOModal } from './components/IPOModal'
+import { AcquisitionModal } from './components/AcquisitionModal'
 import { useGlossary, InfoTip } from './components/Glossary'
 import { LinkageExplainer } from './components/LinkageExplainer'
 import { BadgesPanel } from './components/BadgesPanel'
@@ -226,6 +227,16 @@ export function App() {
   )
   const ipoAllowed = (scenario.enabledOneTimeActions ?? []).includes('ipo') && !game.current.listed
   const [ipoOpen, setIpoOpen] = useState(false)
+
+  // M&A: シナリオ開放・未買収・ターゲット定義あり。借入対価の残枠は通常借入の入力分を除く。
+  const maAllowed =
+    (scenario.enabledOneTimeActions ?? []).includes('ma') &&
+    !game.current.acquiredCompetitor &&
+    scenario.params.acqTargetNetAssets != null
+  const [maOpen, setMaOpen] = useState(false)
+  const maDebtHeadroom = Math.max(0, credit.borrowLimit - Math.max(0, decision.financing))
+  const maBvps =
+    (game.current.sharesOutstanding ?? 0) > 0 ? equity / (game.current.sharesOutstanding ?? 1) : 0
 
   const warnings = useMemo(() => {
     const w: string[] = []
@@ -554,6 +565,23 @@ export function App() {
         </section>
       )}
 
+      {maAllowed && !gameOver && (
+        <section className="panel">
+          <h2>
+            🤝 競合の買収（M&A） <InfoTip term="のれん" />
+          </h2>
+          <p className="muted small">
+            ライバル企業を買収すると、シェアの取り合いが消え、設備 {yen(scenario.params.acqTargetNetAssets ?? 0)}・
+            従業員 {num(scenario.params.acqTargetHeadcount ?? 0)}人・顧客基盤（需要 +
+            {pct(scenario.params.acqTargetDemandBoost ?? 0)}）を受け入れます。 対価が受入純資産を上回る分は
+            <strong>のれん</strong>として資産計上し、毎期償却します。
+          </p>
+          <div className="actions">
+            <button onClick={() => setMaOpen(true)}>買収を検討する ▶</button>
+          </div>
+        </section>
+      )}
+
       {!gameOver && (
         <ForecastPanel
           preview={preview}
@@ -615,7 +643,16 @@ export function App() {
         <div role="tabpanel" id="panel-market" aria-labelledby="tab-market">
           <MacroPanel macro={game.macro} effectiveRate={effectiveRate} />
 
-          {hasCompetitor ? (
+          {game.current.acquiredCompetitor ? (
+            <section className="product">
+              <h2>競合・市場シェア</h2>
+              <p className="small">
+                🤝 <strong>競合は買収済みです。</strong>シェアの取り合いはなくなり、獲得した顧客基盤で需要が +
+                {pct(scenario.params.acqTargetDemandBoost ?? 0)} されています。B/S には
+                <strong>のれん</strong>が計上され、毎期償却されています（財務タブ参照）。
+              </p>
+            </section>
+          ) : hasCompetitor ? (
             <section className="product">
               <h2>競合・市場シェア</h2>
               <div className="product-grid">
@@ -671,6 +708,26 @@ export function App() {
             setIpoOpen(false)
           }}
           onClose={() => setIpoOpen(false)}
+        />
+      )}
+
+      {maOpen && (
+        <AcquisitionModal
+          targetNetAssets={scenario.params.acqTargetNetAssets ?? 0}
+          targetHeadcount={scenario.params.acqTargetHeadcount ?? 0}
+          demandBoost={scenario.params.acqTargetDemandBoost ?? 0}
+          goodwillAmortRate={scenario.params.goodwillAmortRate ?? 0}
+          debtHeadroom={maDebtHeadroom}
+          stockAvailable={maBvps > 0}
+          bvps={maBvps}
+          cash={game.current.balanceSheet.currentAssets.cash}
+          preview={(mix) => previewTurn(game, { ...decision, acquire: mix })}
+          onConfirm={(mix) => {
+            // 拡張済みの判断を直接 play（stale state を踏まない）。
+            play({ ...decision, acquire: mix })
+            setMaOpen(false)
+          }}
+          onClose={() => setMaOpen(false)}
         />
       )}
 

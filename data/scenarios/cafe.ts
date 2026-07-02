@@ -67,6 +67,11 @@ export const cafeScenario: Scenario = {
     rdCostReductionMax: 0.2,
     rdDemandBoostMax: 0.6,
     rdHalf: 200_000,
+    // M&A（近所のライバル店を買収して常連客ごと受け入れる）
+    acqTargetNetAssets: 250_000, // 受入純資産＝店舗・厨房設備
+    acqTargetHeadcount: 4, // スタッフ4人を受け入れ
+    acqTargetDemandBoost: 0.2, // 常連客の獲得で需要+20%
+    goodwillAmortRate: 0.1, // のれんは10年で償却
     interestRate: 0.02,
     effectiveTaxRate: 0.3,
     inflationTarget: 0.02,
@@ -80,4 +85,6 @@ export const cafeScenario: Scenario = {
     label: '借入を完済して無借金経営にする',
     withinTurns: 96,
   },
+  // M&A のみ開放（IPO は小さな店のテーマ外）。借入で買収すると完済目標と相反する＝資金調達の学び。
+  enabledOneTimeActions: ['ma'],
 }

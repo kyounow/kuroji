@@ -124,8 +124,10 @@ export function resolveTurn(
   const shareMultiplier = options.demandShareMultiplier ?? 1
   // 需要ブレ（確定時のみ。プレビューは未指定＝1で中心値）。実際の販売に不確実性を持たせる。
   const demandNoise = options.demandNoise ?? 1
-  // 全社レベルの需要乗数（上場の知名度ブースト等）。単一の適用点＝製品ライン別化しても一括で掛ける。
-  const companyDemandMultiplier = state.listed ? 1 + (params.listingDemandBoost ?? 0) : 1
+  // 全社レベルの需要乗数（上場の知名度・買収した顧客基盤）。単一の適用点＝製品ライン別化しても一括で掛ける。
+  const companyDemandMultiplier =
+    (state.listed ? 1 + (params.listingDemandBoost ?? 0) : 1) *
+    (state.acquiredCompetitor ? 1 + (params.acqTargetDemandBoost ?? 0) : 1)
   // 物価上昇時に名目価格を据え置くと実質値下げ→需要増（unitPrice を物価で割る）。
   const rawDemand = demandAt(decision.unitPrice / inflationIndex, params)
   const demand = Math.max(
@@ -169,6 +171,9 @@ export function resolveTurn(
     state.listed && params.listingCost
       ? Math.round(params.listingCost * inflationIndex * periodFactor)
       : 0
+  // のれん償却（期首ののれん簿価×年率を期間スケール）。減価償却と同じく非現金費用＝営業CFで足し戻す。
+  const goodwillBegin = bs.fixedAssets.goodwill ?? 0
+  const goodwillAmort = Math.round(goodwillBegin * (params.goodwillAmortRate ?? 0) * periodFactor)
   const operatingExpenses =
     fixedCosts +
     depreciation +
@@ -179,7 +184,8 @@ export function resolveTurn(
     laborCost +
     hiringCost +
     severanceCost +
-    listingCostNow
+    listingCostNow +
+    goodwillAmort
   const operatingIncome = grossProfit - operatingExpenses
 
   // 実効金利＝政策金利（マクロ）＋銀行スプレッド＋信用スプレッド（期首の財務状態で評価）。
@@ -287,11 +293,49 @@ export function resolveTurn(
     Math.max(0, Math.min(bs.equity.retainedEarnings, cashBegin)),
   )
 
-  // 非現金の設備減（減価償却＋設備毀損）を足し戻す。保険補償分の現金は netIncome 経由で流入。
+  // M&A（競合の買収・一度きり）: 対価＝現金＋借入＋株式。取得会計＝受入純資産（設備）との差がのれん。
+  //  - 借入対価は通常の financing と合算で信用枠内（素通りの抜け穴を作らない）
+  //  - 株式対価は BVPS>0 のときのみ（株なき資本注入を作らない）。調達分は paidInSinceStart に加算
+  //  - 対価合計が受入純資産未満は不成立（負ののれんは扱わない＝恒等式が恒等的に成立する範囲に限定）
+  //  - 受け入れた設備・人員・需要ブーストは期末に反映（翌期から稼働）
+  let acqCash = 0
+  let acqDebt = 0
+  let acqStock = 0
+  let acqStockShares = 0
+  let acqGoodwill = 0
+  let acqEquipment = 0
+  let acqHeads = 0
+  const targetNetAssets = params.acqTargetNetAssets ?? 0
+  if (decision.acquire && !state.acquiredCompetitor && targetNetAssets > 0) {
+    acqCash = Math.max(0, Math.round(decision.acquire.cashPaid))
+    const debtHeadroom = Math.max(0, credit.borrowLimit - Math.max(0, financing))
+    acqDebt = Math.min(Math.max(0, Math.round(decision.acquire.debtRaised)), debtHeadroom)
+    const bvpsNow = sharesBegin > 0 ? equityBegin / sharesBegin : 0
+    acqStock = bvpsNow > 0 ? Math.max(0, Math.round(decision.acquire.stockValue)) : 0
+    acqStockShares = bvpsNow > 0 ? Math.round(acqStock / bvpsNow) : 0
+    if (acqStockShares <= 0) acqStock = 0
+    const consideration = acqCash + acqDebt + acqStock
+    if (consideration >= targetNetAssets) {
+      acqEquipment = targetNetAssets // 受入純資産＝ターゲットの設備簿価（負債なしの簡易モデル）
+      acqGoodwill = consideration - targetNetAssets
+      acqHeads = Math.max(0, params.acqTargetHeadcount ?? 0)
+    } else {
+      // 不成立（対価不足）。何も動かさない。
+      acqCash = 0
+      acqDebt = 0
+      acqStock = 0
+      acqStockShares = 0
+    }
+  }
+  const acquisitionConsideration = acqCash + acqDebt + acqStock
+  const acquiredNow = state.acquiredCompetitor === true || acquisitionConsideration > 0
+
+  // 非現金の設備減（減価償却＋設備毀損）とのれん償却を足し戻す。保険補償分の現金は netIncome 経由で流入。
   const nonCashEquipReduction = depreciation + equipmentWritedown
-  const operating = netIncome + nonCashEquipReduction - deltaAR - deltaInventory + deltaAP
-  const investing = -capex
-  const financingCF = financing + equityIssue + ipoProceeds - dividendPaid // 借入＋増資＋IPO−配当
+  const operating = netIncome + nonCashEquipReduction + goodwillAmort - deltaAR - deltaInventory + deltaAP
+  // 買収に支払った現金（自己資金＋借入分）は投資CF、借入の調達は財務CF ＝ 現金純減は自己資金分だけ。
+  const investing = -capex - (acqCash + acqDebt)
+  const financingCF = financing + equityIssue + ipoProceeds + acqDebt - dividendPaid // 借入＋増資＋IPO＋買収借入−配当
   const netChange = operating + investing + financingCF
   const cashEnd = cashBegin + netChange
 
@@ -326,19 +370,22 @@ export function resolveTurn(
     materialIndex: options.nextMaterialIndex ?? state.materialIndex,
     rdStock: state.rdStock + rdSpend,
     condition: conditionNext,
-    headcount,
+    // 買収で受け入れた人員は期末に合流（翌期から人件費・労働能力に反映）。
+    headcount: headcount + acqHeads,
     // 株式が未設定のシナリオ（チュートリアル等）は未設定のまま保つ（後方互換）。
     sharesOutstanding:
-      state.sharesOutstanding == null && newShares === 0 && ipoShares === 0
+      state.sharesOutstanding == null && newShares === 0 && ipoShares === 0 && acqStockShares === 0
         ? undefined
-        : (state.sharesOutstanding ?? 0) + newShares + ipoShares,
+        : (state.sharesOutstanding ?? 0) + newShares + ipoShares + acqStockShares,
     // 調達累積（目標の「稼いだ純資産」判定に使う）。未調達なら undefined のまま（セーブ後方互換）。
     paidInSinceStart:
-      state.paidInSinceStart == null && equityIssue + ipoProceeds === 0
+      state.paidInSinceStart == null && equityIssue + ipoProceeds + acqStock === 0
         ? undefined
-        : (state.paidInSinceStart ?? 0) + equityIssue + ipoProceeds,
+        : (state.paidInSinceStart ?? 0) + equityIssue + ipoProceeds + acqStock,
     // 上場ステータス（IPO 成立で true。未上場は undefined のまま＝セーブ後方互換）。
     listed: listedNow ? true : undefined,
+    // 競合買収ステータス（成立で true・以後シェア争い消滅＋需要ブースト）。
+    acquiredCompetitor: acquiredNow ? true : undefined,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,
@@ -347,17 +394,22 @@ export function resolveTurn(
         finishedGoods: finValEnd,
       },
       fixedAssets: {
-        equipment: bs.fixedAssets.equipment - nonCashEquipReduction + capex,
+        equipment: bs.fixedAssets.equipment - nonCashEquipReduction + capex + acqEquipment,
+        // のれん＝期首−償却＋当期買収分。未保有なら undefined のまま（後方互換）。
+        goodwill:
+          bs.fixedAssets.goodwill == null && acqGoodwill === 0
+            ? undefined
+            : goodwillBegin - goodwillAmort + acqGoodwill,
       },
       currentLiabilities: {
         accountsPayable: apEnd,
         shortTermDebt: bs.currentLiabilities.shortTermDebt,
       },
       nonCurrentLiabilities: {
-        longTermDebt: bs.nonCurrentLiabilities.longTermDebt + financing,
+        longTermDebt: bs.nonCurrentLiabilities.longTermDebt + financing + acqDebt,
       },
       equity: {
-        capitalStock: bs.equity.capitalStock + equityIssue + ipoProceeds,
+        capitalStock: bs.equity.capitalStock + equityIssue + ipoProceeds + acqStock,
         retainedEarnings: bs.equity.retainedEarnings + netIncome - dividendPaid,
       },
     },
@@ -382,6 +434,8 @@ export function resolveTurn(
     attritionQuits,
     dividendPaid,
     ipoProceeds,
+    goodwillAmortized: goodwillAmort,
+    acquisitionConsideration,
     shockOneOffLoss: oneOffLoss,
     shockEquipmentWritedown: equipmentWritedown,
     capacity,

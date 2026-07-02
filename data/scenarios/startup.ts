@@ -76,6 +76,11 @@ export const startupScenario: Scenario = {
     listingDemandBoost: 0.15, // 上場の知名度で需要+15%
     ipoEquityThreshold: 1_000_000,
     ipoProfitablePeriods: 6,
+    // M&A（競合スタートアップの吸収＝アクハイヤー含む）
+    acqTargetNetAssets: 200_000, // 受入純資産＝サーバー・開発環境
+    acqTargetHeadcount: 2, // エンジニア2人を受け入れ
+    acqTargetDemandBoost: 0.15,
+    goodwillAmortRate: 0.15, // 技術ののれんは陳腐化が速い（約7年償却）
     inflationTarget: 0.02,
     policyNeutralRate: 0.01,
     macroVolatility: 0.45, // 景気変動は大きめだが、薄利のITが受動でも即倒産しない程度に緩和
@@ -87,5 +92,5 @@ export const startupScenario: Scenario = {
     target: 1_500_000,
     withinTurns: 96,
   },
-  enabledOneTimeActions: ['ipo'],
+  enabledOneTimeActions: ['ipo', 'ma'],
 }

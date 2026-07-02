@@ -325,6 +325,104 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(balances(withCost.state.balanceSheet)).toBe(true)
   })
 
+  it('M&A: 対価ミックス（現金のみ/借入のみ/株式のみ/混合）すべてで恒等式が成立し、のれん＝対価−受入純資産', () => {
+    const { initialState, params } = base()
+    const p = { ...params, acqTargetNetAssets: 500_000, acqTargetHeadcount: 3 }
+    const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
+    const mixes = [
+      { cashPaid: 800_000, debtRaised: 0, stockValue: 0 },
+      { cashPaid: 0, debtRaised: 800_000, stockValue: 0 },
+      { cashPaid: 0, debtRaised: 0, stockValue: 800_000 },
+      { cashPaid: 300_000, debtRaised: 300_000, stockValue: 200_000 },
+    ]
+    for (const acquire of mixes) {
+      const r = resolveTurn(state, decide({ produceUnits: 0, acquire }), p)
+      expect(r.acquisitionConsideration).toBe(800_000)
+      expect(r.state.balanceSheet.fixedAssets.goodwill).toBe(300_000) // 800,000 − 500,000
+      expect(r.state.balanceSheet.fixedAssets.equipment).toBeGreaterThanOrEqual(
+        state.balanceSheet.fixedAssets.equipment + 500_000 - 100_000, // 設備受入（減価償却分は差し引き）
+      )
+      expect(r.state.acquiredCompetitor).toBe(true)
+      expect(balances(r.state.balanceSheet)).toBe(true)
+      // CF三区分和＝Δcash は構成上保証されるが明示確認
+      expect(r.cashFlow.netChange).toBe(r.cashFlow.operating + r.cashFlow.investing + r.cashFlow.financing)
+    }
+  })
+
+  it('M&A: 借入対価は通常借入と合算で信用枠内・株式対価はBVPS>0のみ・対価不足は不成立', () => {
+    const { initialState, params } = base()
+    const p = { ...params, acqTargetNetAssets: 500_000 }
+    const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
+    // 借入枠: equity 7M × AAA(3.0) − debt 3M = 18M。通常借入 17.5M を先に使うと買収借入の残枠は 0.5M。
+    const r1 = resolveTurn(
+      state,
+      decide({ produceUnits: 0, financing: 17_500_000, acquire: { cashPaid: 0, debtRaised: 9_999_999, stockValue: 0 } }),
+      p,
+    )
+    const debtAdded =
+      r1.state.balanceSheet.nonCurrentLiabilities.longTermDebt - state.balanceSheet.nonCurrentLiabilities.longTermDebt
+    expect(debtAdded).toBeLessThanOrEqual(18_000_000) // 合算で枠内
+    expect(balances(r1.state.balanceSheet)).toBe(true)
+    // 株式基盤なし → 株式対価は無効＝現金0・借入0なら不成立
+    const r2 = resolveTurn(
+      initialState,
+      decide({ produceUnits: 0, acquire: { cashPaid: 0, debtRaised: 0, stockValue: 800_000 } }),
+      p,
+    )
+    expect(r2.acquisitionConsideration).toBe(0)
+    expect(r2.state.acquiredCompetitor).toBeUndefined()
+    // 対価不足（受入純資産未満）→ 不成立（負ののれんは作らない）
+    const r3 = resolveTurn(
+      state,
+      decide({ produceUnits: 0, acquire: { cashPaid: 300_000, debtRaised: 0, stockValue: 0 } }),
+      p,
+    )
+    expect(r3.acquisitionConsideration).toBe(0)
+    expect(r3.state.balanceSheet.fixedAssets.goodwill).toBeUndefined()
+  })
+
+  it('M&A: 一度きり（買収済みなら acquire は無視）・のれんは毎期償却され営業CFに足し戻る', () => {
+    const { initialState, params } = base()
+    const p = { ...params, acqTargetNetAssets: 500_000, goodwillAmortRate: 0.12 } // 年12% → 月1%
+    const acquired: CompanyState = {
+      ...initialState,
+      sharesOutstanding: 1_000,
+      acquiredCompetitor: true,
+      balanceSheet: {
+        ...initialState.balanceSheet,
+        fixedAssets: { equipment: initialState.balanceSheet.fixedAssets.equipment, goodwill: 300_000 },
+        // 恒等式を保つため現金を同額減らした初期状態にする
+        currentAssets: {
+          ...initialState.balanceSheet.currentAssets,
+          cash: initialState.balanceSheet.currentAssets.cash - 300_000,
+        },
+      },
+    }
+    expect(balances(acquired.balanceSheet)).toBe(true)
+    const r = resolveTurn(
+      acquired,
+      decide({ produceUnits: 0, acquire: { cashPaid: 900_000, debtRaised: 0, stockValue: 0 } }),
+      p,
+    )
+    // 二重買収は無視
+    expect(r.acquisitionConsideration).toBe(0)
+    // のれん償却: 300,000 × 12% ÷ 12 = 3,000 が販管費に乗り、のれんが減る
+    expect(r.goodwillAmortized).toBe(3_000)
+    expect(r.state.balanceSheet.fixedAssets.goodwill).toBe(297_000)
+    const noGw = resolveTurn(initialState, decide({ produceUnits: 0 }), p)
+    expect(r.incomeStatement.operatingExpenses - noGw.incomeStatement.operatingExpenses).toBe(3_000)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('M&A: 買収済みは需要ブーストが掛かる（companyDemandMultiplier）', () => {
+    const { initialState, params } = base()
+    const p = { ...params, acqTargetNetAssets: 500_000, acqTargetDemandBoost: 0.2 }
+    const acquired: CompanyState = { ...initialState, acquiredCompetitor: true }
+    const withBoost = resolveTurn(acquired, decide({}), p)
+    const without = resolveTurn(initialState, decide({}), p)
+    expect(withBoost.demand).toBeGreaterThan(without.demand)
+  })
+
   it('株式未設定のシナリオは増資0で sharesOutstanding を未設定のまま保つ（後方互換）', () => {
     const { initialState, params } = base()
     // initialState は sharesOutstanding を持たない（undefined）

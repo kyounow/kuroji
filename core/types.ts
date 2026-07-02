@@ -15,6 +15,8 @@ export interface BalanceSheet {
   /** 固定資産（設備など、減価償却後の簿価） */
   fixedAssets: {
     equipment: number
+    /** のれん（M&A の取得価額−受入純資産）。毎期償却。未設定は 0。 */
+    goodwill?: number
   }
   /** 流動負債（買掛金・短期借入 など） */
   currentLiabilities: {
@@ -72,6 +74,8 @@ export interface CompanyState {
   paidInSinceStart?: number
   /** 上場済みか（IPO後 true）。上場維持コストと知名度ブーストが掛かる。未設定＝未上場。 */
   listed?: boolean
+  /** 競合を買収済みか（M&A後 true）。シェア争いが消え、買収ブーストが掛かる。未設定＝未買収。 */
+  acquiredCompetitor?: boolean
 }
 
 /** 研究開発の成果として変化する製品パラメータ。 */
@@ -118,6 +122,12 @@ export interface Decision {
    * エンジンは 未上場・株式あり・バリュエーション>0 のときだけ実行する（不可なら無視）。
    */
   goPublic?: { proceeds: number }
+  /**
+   * M&A（競合の買収・一度きり）。対価は 現金＋借入＋株式 のミックス。
+   * 借入は信用枠（通常の financing と合算）内、株式は BVPS>0 のときのみ有効。
+   * 対価合計が受入純資産（acqTargetNetAssets）未満なら不成立（負ののれんは扱わない）。
+   */
+  acquire?: { cashPaid: number; debtRaised: number; stockValue: number }
 }
 
 /** 市況イベント（需要乗数のほか、突発ショックの損失を持てる）。 */
@@ -238,6 +248,10 @@ export interface TurnResult {
   dividendPaid: number
   /** 当期の IPO 調達額（実行されなければ 0） */
   ipoProceeds: number
+  /** 当期ののれん償却額 */
+  goodwillAmortized: number
+  /** 当期の買収対価合計（不成立なら 0） */
+  acquisitionConsideration: number
   /** 当期に算出された一時損失（保険前 gross。floor/cap/severity 適用後。バナーの見込み額に使う） */
   shockOneOffLoss: number
   /** 当期に算出された設備毀損（保険前 gross。簿価クリップ後。バナーの見込み額に使う） */
@@ -368,6 +382,16 @@ export interface SimParams {
   ipoEquityThreshold?: number
   /** 上場基準: 直近の連続黒字月数。未設定は 6。 */
   ipoProfitablePeriods?: number
+
+  // --- M&A（競合の買収。未設定のシナリオでは買収不可） ---
+  /** 買収ターゲットの受入純資産（＝受け入れる設備の簿価。対価との差がのれんになる） */
+  acqTargetNetAssets?: number
+  /** 買収で加わる従業員数 */
+  acqTargetHeadcount?: number
+  /** 買収後の需要ブースト（顧客基盤の獲得。例 0.15 = +15%。以後ずっと） */
+  acqTargetDemandBoost?: number
+  /** のれんの年間償却率（例 0.1 = 10年で償却） */
+  goodwillAmortRate?: number
 
   /** 有利子負債（期首）に対する銀行スプレッド（政策金利に上乗せ） */
   interestRate: number

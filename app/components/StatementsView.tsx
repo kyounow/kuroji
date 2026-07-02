@@ -108,6 +108,9 @@ function StatementsViewImpl({ state, last, periodsPerYear, history }: Props) {
           <Row label={`製品（${num(state.finishedUnits)}個）`} value={bs.currentAssets.finishedGoods} />
           <Row label="流動資産 計" value={currentAssets} kind="sub" />
           <Row label="設備（簿価）" value={bs.fixedAssets.equipment} />
+          {(bs.fixedAssets.goodwill ?? 0) > 0 && (
+            <Row label="のれん" value={bs.fixedAssets.goodwill ?? 0} term="のれん" />
+          )}
           <Row label="資産合計" value={totalAssets(bs)} kind="total" />
           <tr className="section"><th colSpan={2}>負債・純資産の部</th></tr>
           <Row label="買掛金" value={bs.currentLiabilities.accountsPayable} term="買掛金" />

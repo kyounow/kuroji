@@ -173,7 +173,10 @@ function turnOptionsFor(game: GameState, decision: Decision, eventOverride?: Mar
   )
   const comp = competitorAt(scenario.params, game.seed, game.current.turn)
   const ourQuality = productFromRd(game.current.rdStock, scenario.params).demandModifier
-  const demandShareMultiplier = shareMultiplier(decision.unitPrice, ourQuality, comp, scenario.params)
+  // 競合を買収済みならシェアの取り合いは消滅（乗数1）。ブースト分はエンジン側 companyDemandMultiplier が担う。
+  const demandShareMultiplier = game.current.acquiredCompetitor
+    ? 1
+    : shareMultiplier(decision.unitPrice, ourQuality, comp, scenario.params)
   // IPO のバリュエーション（直近1年の純利益×PER）。履歴の集計が要るためここで注入する（決定論・プレビューも同値）。
   const ppy = scenario.params.periodsPerYear ?? 1
   const annualNetIncome = game.history.slice(-ppy).reduce((s, h) => s + h.incomeStatement.netIncome, 0)
