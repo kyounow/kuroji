@@ -65,6 +65,11 @@ export interface CompanyState {
   headcount?: number
   /** 発行済株式数。増資・M&A・上場で増える。EPS・1株あたり純資産・希薄化の基準。未設定は 0。 */
   sharesOutstanding?: number
+  /**
+   * ゲーム開始後に増資・IPO・株式対価で調達した累積額。
+   * 目標（equityTarget）は「稼いだ純資産」＝純資産−これ で判定する（資本注入で目標を買えないように）。未設定は 0。
+   */
+  paidInSinceStart?: number
 }
 
 /** 研究開発の成果として変化する製品パラメータ。 */
@@ -328,6 +333,8 @@ export interface SimParams {
   rdHalf: number
 
   // --- 財務・税 ---
+  /** 1期に発行できる増資の上限（期首純資産に対する比率＝投資家の受け入れ枠）。未設定は 0.25。 */
+  equityIssueCapRatio?: number
   /** 有利子負債（期首）に対する銀行スプレッド（政策金利に上乗せ） */
   interestRate: number
   /** 法人税の実効税率（暫定フラット。のち出典付きテーブル化） */

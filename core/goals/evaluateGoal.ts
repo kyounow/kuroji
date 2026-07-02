@@ -38,24 +38,29 @@ export function evaluateGoal(goal: Goal, current: CompanyState, initial: Company
 
   switch (goal.kind) {
     case 'equityTarget': {
-      const equity = totalEquity(current.balanceSheet)
-      const start = totalEquity(initial.balanceSheet)
+      // 「稼いだ純資産」で判定＝純資産から増資・IPO等の調達分（paidInSinceStart）を除く。
+      // 資本注入そのものでは目標を達成できず、調達→成長→利益 と回して初めて効く（資本政策の学び）。
+      const paidIn = current.paidInSinceStart ?? 0
+      const equity = totalEquity(current.balanceSheet) - paidIn
+      const start = totalEquity(initial.balanceSheet) - (initial.paidInSinceStart ?? 0)
       const denom = goal.target - start
       const progress = denom > 0 ? clamp01((equity - start) / denom) : equity >= goal.target ? 1 : 0
       const within = goal.withinTurns
       const label = modeLabel(goal.label, within)
+      const word = paidIn > 0 ? '稼いだ純資産' : '純資産'
+      const note = paidIn > 0 ? `（増資等の調達分 ${yen(paidIn)} を除く）` : ''
       if (equity >= goal.target) {
-        return { status: 'won', progress: 1, label, detail: `純資産 ${yen(equity)} 到達` }
+        return { status: 'won', progress: 1, label, detail: `${word} ${yen(equity)} 到達${note}` }
       }
       if (within !== undefined && turn >= within) {
-        return { status: 'lost', progress, label, detail: `期限切れ（純資産 ${yen(equity)}）` }
+        return { status: 'lost', progress, label, detail: `期限切れ（${word} ${yen(equity)}${note}）` }
       }
       const tail = within !== undefined ? `・残り${within - turn}ヶ月` : ''
       return {
         status: 'progress',
         progress,
         label,
-        detail: `純資産 ${yen(equity)} / 目標 ${yen(goal.target)}${tail}`,
+        detail: `${word} ${yen(equity)} / 目標 ${yen(goal.target)}${tail}${note}`,
       }
     }
     case 'repayAll': {

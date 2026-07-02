@@ -220,11 +220,23 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
 
   it('増資で発行済株数が増える（簿価発行・希薄化）', () => {
     const { initialState, params } = base()
-    // 純資産7,000,000・1,000株 → BVPS 7,000。350万円増資 → 500株発行 → 1,500株。
+    // 純資産7,000,000・1,000株 → BVPS 7,000。175万円増資（受け入れ枠25%以内） → 250株発行 → 1,250株。
     const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
     const equityBegin = totalEquity(state.balanceSheet) // 7,000,000
+    const r = resolveTurn(state, decide({ produceUnits: 0, equityIssuance: equityBegin / 4 }), params)
+    expect(r.state.sharesOutstanding).toBe(1_250) // +250株（1/4額分）
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('増資は1期あたり期首純資産×25%（受け入れ枠）でキャップされる', () => {
+    const { initialState, params } = base()
+    const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
+    const equityBegin = totalEquity(state.balanceSheet) // 7,000,000 → キャップ 1,750,000
+    // 枠の2倍（350万円）を指示しても、資本金の増加はキャップまで。
     const r = resolveTurn(state, decide({ produceUnits: 0, equityIssuance: equityBegin / 2 }), params)
-    expect(r.state.sharesOutstanding).toBe(1_500) // +500株（半額分）
+    const cap = Math.round(equityBegin * 0.25)
+    expect(r.state.balanceSheet.equity.capitalStock).toBe(state.balanceSheet.equity.capitalStock + cap)
+    expect(r.state.paidInSinceStart).toBe(cap)
     expect(balances(r.state.balanceSheet)).toBe(true)
   })
 

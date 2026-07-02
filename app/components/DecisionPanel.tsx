@@ -50,6 +50,8 @@ interface Props {
   equity?: number
   /** 増資: 現在の発行済株数 */
   sharesOutstanding?: number
+  /** 増資: 1期の発行上限（期首純資産×受け入れ枠。超過分は自動制限） */
+  equityIssueCap?: number
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -153,6 +155,7 @@ export function DecisionPanel({
   maxAttrition = 1,
   equity = 0,
   sharesOutstanding = 0,
+  equityIssueCap,
 }: Props) {
   // 給与水準（相場=100）と離職率。市場賃金は物価指数で連動。
   const marketWage = Math.round(wage * inflationIndex)
@@ -193,10 +196,12 @@ export function DecisionPanel({
     if (f.key === 'fire') return `退職金 ${yen(severance)}/人 → 人件費・労働能力↓`
     if (f.key === 'wageLevel')
       return `相場 ${yen(marketWage)}/年・支給 ${yen(offeredWage)}/年。${decision.wageLevel < 100 ? `市場割れ→離職率 ${pct(attritionRate)}/月` : '相場以上＝離職なし'}`
-    if (f.key === 'equityIssuance')
+    if (f.key === 'equityIssuance') {
+      const capText = equityIssueCap != null ? `。今期の発行上限 ${yen(equityIssueCap)}（投資家の受け入れ枠）` : ''
       return decision.equityIssuance > 0
-        ? `発行価格 ${yen(bvps)}/株 → 約${newShares.toLocaleString('ja-JP')}株発行（無利息）。希薄化後の持分 ${pct(ownershipKept)}`
-        : `発行価格 ${yen(bvps)}/株（純資産÷株数）。発行で現金↑・無利息だが株数↑＝希薄化`
+        ? `発行価格 ${yen(bvps)}/株 → 約${newShares.toLocaleString('ja-JP')}株発行（無利息）。希薄化後の持分 ${pct(ownershipKept)}${capText}`
+        : `発行価格 ${yen(bvps)}/株（純資産÷株数）。発行で現金↑・無利息だが株数↑＝希薄化${capText}`
+    }
     if (f.key === 'financing') return `格付${creditGrade}・借入上限 ${yen(borrowLimit)}・金利 ${pct(effectiveRate)}`
     return f.hint
   }

@@ -1,4 +1,5 @@
 // ローカル保存（ベストスコア＋ゲームの続き）。完全クライアントサイド・localStorage のみ。
+import { balances, type BalanceSheet } from '@core/index'
 
 // ---- ベストスコア ----
 const BEST_KEY = (scenarioId: string) => `kuroji.best.${scenarioId}`
@@ -48,9 +49,40 @@ export function saveBadges(ids: string[]): void {
 }
 
 // ---- ゲームの続き（全状態セーブ） ----
-// version はゲーム状態のスキーマ版。破壊的変更時に上げると古いセーブは無効化される。
+// version はゲーム状態のスキーマ版。
+// 【運用ルール】optional フィールドの追加は version 据置（エンジン側の `?? 既定` が吸収）。
+// フィールドの移動・削除など「構造変更」のときだけ +1 し、下の MIGRATIONS に fromVersion→変換 を登録する
+// （公開プレイヤーの進捗を消さないため。移行不能なときだけ従来どおりリセット＋告知）。
 const SAVE_KEY = 'kuroji.save'
 const SAVE_VERSION = 5 // Phase2（発行済株数 sharesOutstanding を CompanyState に追加）
+
+/** fromVersion → 1つ先のスキーマへの変換。 */
+type Migration = (data: unknown) => unknown
+const MIGRATIONS: Record<number, Migration> = {
+  // 例) 5: (d) => ({ ...(d as object), current: { ...… } })  // v5→v6 の構造変更をここに
+}
+
+/** version から現行スキーマへ移行できるか（チェーンが途切れていないか）。 */
+function canMigrate(version: unknown): version is number {
+  if (version === SAVE_VERSION) return true
+  if (typeof version !== 'number' || version > SAVE_VERSION) return false
+  for (let v = version; v < SAVE_VERSION; v++) if (!MIGRATIONS[v]) return false
+  return true
+}
+
+/**
+ * 保存データを現行スキーマへ移行する（不可なら null）。
+ * 移行後は会計恒等式で健全性を確認し、壊れた移行ではゲームを開かない。
+ */
+export function migrateGameData(version: unknown, data: unknown): unknown | null {
+  if (!canMigrate(version)) return null
+  if (version === SAVE_VERSION) return data
+  let cur = data
+  for (let v = version; v < SAVE_VERSION; v++) cur = MIGRATIONS[v](cur)
+  const bs = (cur as { current?: { balanceSheet?: BalanceSheet } } | null)?.current?.balanceSheet
+  if (!bs || !balances(bs)) return null
+  return cur
+}
 
 /** 現在のゲーム状態を保存する（自動保存）。型は呼び出し側が保証する。 */
 export function saveGame(state: unknown): void {
@@ -61,14 +93,14 @@ export function saveGame(state: unknown): void {
   }
 }
 
-/** 保存済みゲーム状態を読む（無効/バージョン不一致は null）。 */
+/** 保存済みゲーム状態を読む（旧版は可能なら移行。移行不能なときのみ null）。 */
 export function loadGame(): unknown | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as { version?: number; data?: unknown }
-    if (parsed.version !== SAVE_VERSION) return null
-    return parsed.data ?? null
+    if (parsed.version === SAVE_VERSION) return parsed.data ?? null
+    return migrateGameData(parsed.version, parsed.data)
   } catch {
     return null
   }
@@ -82,8 +114,9 @@ export function wasSaveStale(): boolean {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
     if (!raw) return false
-    const parsed = JSON.parse(raw) as { version?: number }
-    return parsed.version !== SAVE_VERSION
+    const parsed = JSON.parse(raw) as { version?: number; data?: unknown }
+    // 旧版でも移行できるならリセットは起きない＝告知不要。移行不能なときだけ true。
+    return parsed.version !== SAVE_VERSION && migrateGameData(parsed.version, parsed.data) === null
   } catch {
     return false
   }

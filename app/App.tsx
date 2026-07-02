@@ -11,7 +11,7 @@ import {
   laborCapacity,
   costEfficiency,
 } from '@core/index'
-import { useGame, previewTurn, shockRiskFor } from './state'
+import { useGame, previewTurn, shockRiskFor, defaultDecision } from './state'
 import { EventBanner } from './components/EventBanner'
 import { DecisionPanel } from './components/DecisionPanel'
 import { StatementsView } from './components/StatementsView'
@@ -89,41 +89,12 @@ export function App() {
     }
   }, [view])
 
-  const [decision, setDecision] = useState<Decision>({
-    unitPrice: scenario.params.basePrice,
-    purchaseMaterials: Math.round(scenario.params.baseDemand / (scenario.params.periodsPerYear ?? 1)),
-    produceUnits: Math.round(scenario.params.baseDemand / (scenario.params.periodsPerYear ?? 1)),
-    marketingSpend: 0,
-    rdSpend: 0,
-    insuranceSpend: 0,
-    maintenanceSpend: 0,
-    capitalExpenditure: 0,
-    hire: 0,
-    fire: 0,
-    wageLevel: 100,
-    equityIssuance: 0,
-    financing: 0,
-  })
+  const [decision, setDecision] = useState<Decision>(() => defaultDecision(game.scenarioId))
   const patch = useCallback((p: Partial<Decision>) => setDecision((d) => ({ ...d, ...p })), [])
 
-  // シナリオを切り替えたら判断の初期値もそのシナリオ向けに戻す。
+  // シナリオを切り替えたら判断の初期値もそのシナリオ向けに戻す（定義は defaultDecision に一元化）。
   useEffect(() => {
-    setDecision({
-      unitPrice: scenario.params.basePrice,
-      purchaseMaterials: Math.round(scenario.params.baseDemand / (scenario.params.periodsPerYear ?? 1)),
-      produceUnits: Math.round(scenario.params.baseDemand / (scenario.params.periodsPerYear ?? 1)),
-      marketingSpend: 0,
-      rdSpend: 0,
-      insuranceSpend: 0,
-      maintenanceSpend: 0,
-      capitalExpenditure: 0,
-      hire: 0,
-      fire: 0,
-      wageLevel: 100,
-      equityIssuance: 0,
-      financing: 0,
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setDecision(defaultDecision(game.scenarioId))
   }, [game.scenarioId])
 
   // 表示中の期（既定は最新。過去の期をクリックすると切り替わる）。
@@ -231,6 +202,9 @@ export function App() {
   const shockRisk = useMemo(() => shockRiskFor(game), [game])
 
   // この判断の実現性チェック（確定前の警告。倒産・能力/借入枠オーバーを未然に知らせる）。
+  // 増資の1期あたり上限（投資家の受け入れ枠＝期首純資産×比率）。
+  const equityIssueCap = Math.round(Math.max(0, equity) * (scenario.params.equityIssueCapRatio ?? 0.25))
+
   const warnings = useMemo(() => {
     const w: string[] = []
     if (Number.isFinite(preview.capacity) && decision.produceUnits > preview.capacity) {
@@ -239,11 +213,14 @@ export function App() {
     if (decision.financing > credit.borrowLimit) {
       w.push(`借入 ${yen(decision.financing)} が借入上限 ${yen(credit.borrowLimit)} を超えています（上限まで自動で制限されます）`)
     }
+    if (decision.equityIssuance > equityIssueCap) {
+      w.push(`増資 ${yen(decision.equityIssuance)} は今期の発行上限 ${yen(equityIssueCap)}（投資家の受け入れ枠）を超えています（上限まで自動で制限されます）`)
+    }
     if (preview.cashFlow.cashEnd < 0) {
       w.push(`この判断だと期末の現金が ${yen(preview.cashFlow.cashEnd)}（マイナス）になり、倒産の恐れがあります`)
     }
     return w
-  }, [preview, decision.produceUnits, decision.financing, credit.borrowLimit])
+  }, [preview, decision.produceUnits, decision.financing, decision.equityIssuance, credit.borrowLimit, equityIssueCap])
 
   // 終了時の診断（なぜ勝った/負けたか＋改善点）。
   const diagnosis = useMemo(() => (gameOver ? diagnoseGame(game) : null), [gameOver, game])
@@ -526,6 +503,7 @@ export function App() {
         maxAttrition={scenario.params.maxAttrition}
         equity={equity}
         sharesOutstanding={game.current.sharesOutstanding}
+        equityIssueCap={equityIssueCap}
         warnings={warnings}
       />
 

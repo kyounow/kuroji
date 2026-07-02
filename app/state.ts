@@ -102,6 +102,30 @@ function evalGoal(
   return evaluateGoal(goal, current, scenario.initialState)
 }
 
+/**
+ * シナリオに応じた判断の初期値。**唯一の定義**（App の useState 初期化とシナリオ切替リセットの両方がこれを使う。
+ * 過去に2箇所のリテラル重複が編集漏れバグの温床になったため集約）。
+ */
+export function defaultDecision(scenarioId: string): Decision {
+  const { params } = getScenario(scenarioId)
+  const perPeriod = Math.round(params.baseDemand / (params.periodsPerYear ?? 1))
+  return {
+    unitPrice: params.basePrice,
+    purchaseMaterials: perPeriod,
+    produceUnits: perPeriod,
+    marketingSpend: 0,
+    rdSpend: 0,
+    insuranceSpend: 0,
+    maintenanceSpend: 0,
+    capitalExpenditure: 0,
+    hire: 0,
+    fire: 0,
+    wageLevel: 100,
+    equityIssuance: 0,
+    financing: 0,
+  }
+}
+
 export function makeInitial(scenarioId: string, seed: number, mode: GameMode): GameState {
   const scenario = getScenario(scenarioId)
   return {

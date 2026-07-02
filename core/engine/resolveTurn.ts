@@ -249,8 +249,10 @@ export function resolveTurn(
 
   // 増資（株式発行）: 現金↑・資本金↑（無利息・返済義務なし）。借入とは別の財務CF。
   // 簿価発行（発行価格＝期首BVPS）で新株を発行し、希薄化として株数に反映。
-  const equityIssue = Math.max(0, decision.equityIssuance)
+  // 1期の発行は「期首純資産×受け入れ枠」まで（投資家の需要には限りがある＝無制限の資本注入で目標やB/Sが壊れるのを防ぐ）。
   const equityBegin = bs.equity.capitalStock + bs.equity.retainedEarnings
+  const equityIssueCap = Math.round(Math.max(0, equityBegin) * (params.equityIssueCapRatio ?? 0.25))
+  const equityIssue = Math.min(Math.max(0, decision.equityIssuance), equityIssueCap)
   const newShares = sharesIssued(equityIssue, equityBegin, state.sharesOutstanding ?? 0)
 
   // 非現金の設備減（減価償却＋設備毀損）を足し戻す。保険補償分の現金は netIncome 経由で流入。
@@ -298,6 +300,11 @@ export function resolveTurn(
       state.sharesOutstanding == null && newShares === 0
         ? undefined
         : (state.sharesOutstanding ?? 0) + newShares,
+    // 調達累積（目標の「稼いだ純資産」判定に使う）。未調達なら undefined のまま（セーブ後方互換）。
+    paidInSinceStart:
+      state.paidInSinceStart == null && equityIssue === 0
+        ? undefined
+        : (state.paidInSinceStart ?? 0) + equityIssue,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,
