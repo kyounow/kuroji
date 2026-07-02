@@ -124,6 +124,8 @@ export function resolveTurn(
   const shareMultiplier = options.demandShareMultiplier ?? 1
   // 需要ブレ（確定時のみ。プレビューは未指定＝1で中心値）。実際の販売に不確実性を持たせる。
   const demandNoise = options.demandNoise ?? 1
+  // 全社レベルの需要乗数（上場の知名度ブースト等）。単一の適用点＝製品ライン別化しても一括で掛ける。
+  const companyDemandMultiplier = state.listed ? 1 + (params.listingDemandBoost ?? 0) : 1
   // 物価上昇時に名目価格を据え置くと実質値下げ→需要増（unitPrice を物価で割る）。
   const rawDemand = demandAt(decision.unitPrice / inflationIndex, params)
   const demand = Math.max(
@@ -133,6 +135,7 @@ export function resolveTurn(
         marketingMultiplier(decision.marketingSpend, params) *
         demandMultiplier *
         macroDemandMultiplier *
+        companyDemandMultiplier *
         product.demandModifier *
         shareMultiplier *
         periodFactor *
@@ -161,6 +164,11 @@ export function resolveTurn(
     : 0
   const hiringCost = hire * (params.hireCost ?? 0)
   const severanceCost = fire * (params.severance ?? 0)
+  // 上場維持コスト（監査・IR・ガバナンス）。上場中は毎期かかる固定的費用（年額を期間スケール・物価連動）。
+  const listingCostNow =
+    state.listed && params.listingCost
+      ? Math.round(params.listingCost * inflationIndex * periodFactor)
+      : 0
   const operatingExpenses =
     fixedCosts +
     depreciation +
@@ -170,7 +178,8 @@ export function resolveTurn(
     maintenanceSpend +
     laborCost +
     hiringCost +
-    severanceCost
+    severanceCost +
+    listingCostNow
   const operatingIncome = grossProfit - operatingExpenses
 
   // 実効金利＝政策金利（マクロ）＋銀行スプレッド＋信用スプレッド（期首の財務状態で評価）。
@@ -255,11 +264,34 @@ export function resolveTurn(
   const equityIssue = Math.min(Math.max(0, decision.equityIssuance), equityIssueCap)
   const newShares = sharesIssued(equityIssue, equityBegin, state.sharesOutstanding ?? 0)
 
+  // IPO（新規上場・一度きり）: 公募価格＝時価総額（options.ipoValuation＝年間純利益×PER）÷既存株数。
+  // 未上場・株式基盤あり・バリュエーション>0 のときだけ成立（UIゲートに頼らずエンジンでも自衛）。
+  // 調達は時価総額×ipoMaxRaiseRatio まで（無制限の資本注入を防ぐ）。調達分は paidInSinceStart に加算。
+  const ipoValuationNow = Math.max(0, options.ipoValuation ?? 0)
+  const sharesBegin = state.sharesOutstanding ?? 0
+  let ipoProceeds = 0
+  let ipoShares = 0
+  if (decision.goPublic && !state.listed && sharesBegin > 0 && ipoValuationNow > 0) {
+    const maxRaise = Math.round(ipoValuationNow * (params.ipoMaxRaiseRatio ?? 0.5))
+    ipoProceeds = Math.min(Math.max(0, Math.round(decision.goPublic.proceeds)), maxRaise)
+    const offerPrice = ipoValuationNow / sharesBegin
+    ipoShares = offerPrice > 0 ? Math.round(ipoProceeds / offerPrice) : 0
+    if (ipoShares <= 0) ipoProceeds = 0 // 株が発行できない規模なら不成立（株なき資本注入を作らない）
+  }
+  const listedNow = state.listed === true || ipoProceeds > 0
+
+  // 配当（株主還元）: 利益剰余金と期首現金の小さい方まで。剰余金↓・現金↓・財務CF↓＝同額減で恒等式維持。
+  // 期中の資金繰りまでは守らない（設備投資と同じ思想＝判断は自由、プレビューの現金警告が知らせる）。
+  const dividendPaid = Math.min(
+    Math.max(0, Math.round(decision.dividend)),
+    Math.max(0, Math.min(bs.equity.retainedEarnings, cashBegin)),
+  )
+
   // 非現金の設備減（減価償却＋設備毀損）を足し戻す。保険補償分の現金は netIncome 経由で流入。
   const nonCashEquipReduction = depreciation + equipmentWritedown
   const operating = netIncome + nonCashEquipReduction - deltaAR - deltaInventory + deltaAP
   const investing = -capex
-  const financingCF = financing + equityIssue // 借入＋増資（株式発行）
+  const financingCF = financing + equityIssue + ipoProceeds - dividendPaid // 借入＋増資＋IPO−配当
   const netChange = operating + investing + financingCF
   const cashEnd = cashBegin + netChange
 
@@ -297,14 +329,16 @@ export function resolveTurn(
     headcount,
     // 株式が未設定のシナリオ（チュートリアル等）は未設定のまま保つ（後方互換）。
     sharesOutstanding:
-      state.sharesOutstanding == null && newShares === 0
+      state.sharesOutstanding == null && newShares === 0 && ipoShares === 0
         ? undefined
-        : (state.sharesOutstanding ?? 0) + newShares,
+        : (state.sharesOutstanding ?? 0) + newShares + ipoShares,
     // 調達累積（目標の「稼いだ純資産」判定に使う）。未調達なら undefined のまま（セーブ後方互換）。
     paidInSinceStart:
-      state.paidInSinceStart == null && equityIssue === 0
+      state.paidInSinceStart == null && equityIssue + ipoProceeds === 0
         ? undefined
-        : (state.paidInSinceStart ?? 0) + equityIssue,
+        : (state.paidInSinceStart ?? 0) + equityIssue + ipoProceeds,
+    // 上場ステータス（IPO 成立で true。未上場は undefined のまま＝セーブ後方互換）。
+    listed: listedNow ? true : undefined,
     balanceSheet: {
       currentAssets: {
         cash: cashEnd,
@@ -323,8 +357,8 @@ export function resolveTurn(
         longTermDebt: bs.nonCurrentLiabilities.longTermDebt + financing,
       },
       equity: {
-        capitalStock: bs.equity.capitalStock + equityIssue,
-        retainedEarnings: bs.equity.retainedEarnings + netIncome,
+        capitalStock: bs.equity.capitalStock + equityIssue + ipoProceeds,
+        retainedEarnings: bs.equity.retainedEarnings + netIncome - dividendPaid,
       },
     },
   }
@@ -346,6 +380,8 @@ export function resolveTurn(
     appliedFinancing: financing,
     insuranceCoverage,
     attritionQuits,
+    dividendPaid,
+    ipoProceeds,
     shockOneOffLoss: oneOffLoss,
     shockEquipmentWritedown: equipmentWritedown,
     capacity,

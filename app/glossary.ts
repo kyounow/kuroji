@@ -220,6 +220,34 @@ const entries: GlossaryEntry[] = [
     def: '増資で株数が増え、1株あたりの価値（EPS・BVPS）が下がること。',
     why: '増資は無利息で資金を得られるが、既存株主の持ち分は薄まる。借入とのトレードオフ。',
   },
+  {
+    term: '上場（IPO）',
+    reading: 'じょうじょう',
+    category: 'capital',
+    def: '株式を市場で売買できるようにすること。公募で大型の資金調達ができる。',
+    why: '調達力と知名度が得られる一方、上場維持コスト（監査・IR）と希薄化、市場の目という代償がある。',
+  },
+  {
+    term: '時価総額',
+    reading: 'じかそうがく',
+    category: 'capital',
+    def: '会社全体の市場評価額。株価×発行済株数。このゲームでは 年間純利益×PER で算定。',
+    why: '「利益が会社の値段を作る」。IPO の公募価格・調達力の基準になる。',
+  },
+  {
+    term: 'PER',
+    reading: 'ピーイーアール',
+    category: 'capital',
+    def: '株価収益率。時価総額が年間純利益の何倍か（＝利益の何年分で買える会社か）。',
+    why: '成長期待が高い業種ほど高くなる。このゲームでは業種ごとの倍率で時価総額を決める。',
+  },
+  {
+    term: '配当',
+    reading: 'はいとう',
+    category: 'capital',
+    def: '税引後利益から株主にお金を分配すること。利益剰余金と現金が同額減る。',
+    why: '株主還元と内部留保（再投資）のバランスが配当政策。純資産が減るため成長目標とは相反する。',
+  },
 ]
 
 export const GLOSSARY: Record<string, GlossaryEntry> = Object.fromEntries(

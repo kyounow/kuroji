@@ -69,6 +69,13 @@ export const startupScenario: Scenario = {
     rdHalf: 500_000,
     interestRate: 0.03,
     effectiveTaxRate: 0.3,
+    // IPO・上場（スタートアップの本懐。テック水準の高PER・知名度効果も大きい）
+    earningsMultiple: 15, // 時価総額＝年間純利益×15
+    ipoMaxRaiseRatio: 0.5,
+    listingCost: 100_000, // 上場維持コスト（年額）
+    listingDemandBoost: 0.15, // 上場の知名度で需要+15%
+    ipoEquityThreshold: 1_000_000,
+    ipoProfitablePeriods: 6,
     inflationTarget: 0.02,
     policyNeutralRate: 0.01,
     macroVolatility: 0.45, // 景気変動は大きめだが、薄利のITが受動でも即倒産しない程度に緩和
@@ -80,4 +87,5 @@ export const startupScenario: Scenario = {
     target: 1_500_000,
     withinTurns: 96,
   },
+  enabledOneTimeActions: ['ipo'],
 }

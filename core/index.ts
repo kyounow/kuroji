@@ -22,6 +22,7 @@ export { assessCredit, type CreditInfo, type CreditGrade } from './finance/credi
 export { productionCapacity, laborCapacity, costEfficiency } from './finance/capacity'
 export { breakEven, type BreakEven } from './finance/breakeven'
 export { bookValuePerShare, sharesIssued, earningsPerShare } from './finance/shares'
+export { ipoValuation, ipoOfferPrice, canIPO, type IpoGate } from './finance/ipo'
 export { productFromRd } from './product/research'
 export { materialIndexNext } from './market/material'
 export { competitorAt, shareMultiplier, marketShare, type Competitor } from './market/competitor'

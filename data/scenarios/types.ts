@@ -25,7 +25,12 @@ export interface Scenario {
   turnLimit?: number
   /** 操作可能にする判断フィールド（チュートリアル用。未指定は全て可） */
   enabledDecisions?: DecisionField[]
+  /** 開放する一度きりのアクション（IPO・M&A）。未指定はどちらも不可。 */
+  enabledOneTimeActions?: OneTimeAction[]
 }
+
+/** 一度きりのアクション（モーダル＋確認で実行するもの）。 */
+export type OneTimeAction = 'ipo' | 'ma'
 
 /** 判断フィールドの識別子（チュートリアルの段階開放に使用）。 */
 export type DecisionField =
@@ -41,4 +46,5 @@ export type DecisionField =
   | 'fire'
   | 'wageLevel'
   | 'equityIssuance'
+  | 'dividend'
   | 'financing'

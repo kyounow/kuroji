@@ -10,6 +10,8 @@ import {
   productionCapacity,
   laborCapacity,
   costEfficiency,
+  canIPO,
+  ipoValuation,
 } from '@core/index'
 import { useGame, previewTurn, shockRiskFor, defaultDecision } from './state'
 import { EventBanner } from './components/EventBanner'
@@ -23,6 +25,7 @@ import { ForecastPanel } from './components/ForecastPanel'
 import { CapitalPanel } from './components/CapitalPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SettingsModal } from './components/SettingsModal'
+import { IPOModal } from './components/IPOModal'
 import { useGlossary, InfoTip } from './components/Glossary'
 import { LinkageExplainer } from './components/LinkageExplainer'
 import { BadgesPanel } from './components/BadgesPanel'
@@ -204,6 +207,25 @@ export function App() {
   // この判断の実現性チェック（確定前の警告。倒産・能力/借入枠オーバーを未然に知らせる）。
   // 増資の1期あたり上限（投資家の受け入れ枠＝期首純資産×比率）。
   const equityIssueCap = Math.round(Math.max(0, equity) * (scenario.params.equityIssueCapRatio ?? 0.25))
+  // 配当の上限（利益剰余金と現金の小さい方）。
+  const dividendCap = Math.max(
+    0,
+    Math.min(game.current.balanceSheet.equity.retainedEarnings, game.current.balanceSheet.currentAssets.cash),
+  )
+
+  // IPO: 時価総額（直近1年の純利益×PER）・上場基準・シナリオ開放。
+  const ipoVal = useMemo(() => {
+    const annualNI = game.history
+      .slice(-ppy)
+      .reduce((s, h) => s + h.incomeStatement.netIncome, 0)
+    return ipoValuation(annualNI, scenario.params.earningsMultiple ?? 0)
+  }, [game.history, ppy, scenario.params.earningsMultiple])
+  const ipoGate = useMemo(
+    () => canIPO(game.current, game.history.map((h) => h.incomeStatement.netIncome), scenario.params),
+    [game, scenario.params],
+  )
+  const ipoAllowed = (scenario.enabledOneTimeActions ?? []).includes('ipo') && !game.current.listed
+  const [ipoOpen, setIpoOpen] = useState(false)
 
   const warnings = useMemo(() => {
     const w: string[] = []
@@ -504,8 +526,33 @@ export function App() {
         equity={equity}
         sharesOutstanding={game.current.sharesOutstanding}
         equityIssueCap={equityIssueCap}
+        dividendCap={dividendCap}
         warnings={warnings}
       />
+
+      {ipoAllowed && !gameOver && (
+        <section className="panel">
+          <h2>
+            🏛 上場（IPO） <InfoTip term="上場（IPO）" />
+          </h2>
+          <p className="muted small">
+            時価総額（年間純利益×PER{scenario.params.earningsMultiple ?? '—'}）:{' '}
+            <strong>{ipoVal > 0 ? yen(ipoVal) : '—（直近1年が赤字のため算定不可）'}</strong>。 公募で大型調達ができ、
+            知名度で需要も伸びますが、上場維持コストと希薄化を伴います。
+          </p>
+          {ipoGate.ok ? (
+            <div className="actions">
+              <button onClick={() => setIpoOpen(true)}>上場を検討する ▶</button>
+            </div>
+          ) : (
+            <ul className="diagnosis-points muted small">
+              {ipoGate.reasons.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       {!gameOver && (
         <ForecastPanel
@@ -542,6 +589,11 @@ export function App() {
             game.history.length > 0
               ? game.history[game.history.length - 1].incomeStatement.netIncome
               : null
+          }
+          listed={game.current.listed === true}
+          marketCap={ipoVal}
+          lastDividendPaid={
+            game.history.length > 0 ? game.history[game.history.length - 1].dividendPaid : undefined
           }
         />
       )}
@@ -603,6 +655,24 @@ export function App() {
         </a>
         {' ・ '}© 2026 kyounow
       </footer>
+
+      {ipoOpen && (
+        <IPOModal
+          valuation={ipoVal}
+          sharesOutstanding={game.current.sharesOutstanding ?? 0}
+          maxRaiseRatio={scenario.params.ipoMaxRaiseRatio ?? 0.5}
+          listingCostAnnual={scenario.params.listingCost}
+          listingDemandBoost={scenario.params.listingDemandBoost}
+          gate={ipoGate}
+          preview={(proceeds) => previewTurn(game, { ...decision, goPublic: { proceeds } })}
+          onConfirm={(proceeds) => {
+            // 拡張済みの判断を直接 play（setState 経由にしない＝stale state を踏まない）。
+            play({ ...decision, goPublic: { proceeds } })
+            setIpoOpen(false)
+          }}
+          onClose={() => setIpoOpen(false)}
+        />
+      )}
 
       {settingsOpen && (
         <SettingsModal

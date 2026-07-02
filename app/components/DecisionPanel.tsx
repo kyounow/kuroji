@@ -52,6 +52,8 @@ interface Props {
   sharesOutstanding?: number
   /** 増資: 1期の発行上限（期首純資産×受け入れ枠。超過分は自動制限） */
   equityIssueCap?: number
+  /** 配当: 支払える上限（利益剰余金と現金の小さい方） */
+  dividendCap?: number
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -118,6 +120,7 @@ const FIELDS: readonly FieldDef[] = [
   { key: 'fire', label: '解雇（人数）', step: 1, hint: '' }, // hint は動的
   { key: 'wageLevel', label: '給与水準（％・相場=100）', step: 5, hint: '' }, // hint は動的
   { key: 'equityIssuance', label: '増資（株式発行）', step: 100_000, hint: '' }, // hint は動的
+  { key: 'dividend', label: '配当（株主還元）', step: 10_000, hint: '' }, // hint は動的
   {
     key: 'financing',
     label: '資金調達（借入＋／返済−）',
@@ -156,6 +159,7 @@ export function DecisionPanel({
   equity = 0,
   sharesOutstanding = 0,
   equityIssueCap,
+  dividendCap,
 }: Props) {
   // 給与水準（相場=100）と離職率。市場賃金は物価指数で連動。
   const marketWage = Math.round(wage * inflationIndex)
@@ -201,6 +205,10 @@ export function DecisionPanel({
       return decision.equityIssuance > 0
         ? `発行価格 ${yen(bvps)}/株 → 約${newShares.toLocaleString('ja-JP')}株発行（無利息）。希薄化後の持分 ${pct(ownershipKept)}${capText}`
         : `発行価格 ${yen(bvps)}/株（純資産÷株数）。発行で現金↑・無利息だが株数↑＝希薄化${capText}`
+    }
+    if (f.key === 'dividend') {
+      const capText = dividendCap != null ? `上限 ${yen(Math.max(0, dividendCap))}（利益剰余金と現金の小さい方）。` : ''
+      return `${capText}現金↓・利益剰余金↓＝純資産が減ります（目標との兼ね合いに注意）`
     }
     if (f.key === 'financing') return `格付${creditGrade}・借入上限 ${yen(borrowLimit)}・金利 ${pct(effectiveRate)}`
     return f.hint

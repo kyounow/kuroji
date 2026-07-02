@@ -46,8 +46,9 @@ function checkRecord(rec: GameState['history'][number], prev: GameState['current
   if (cf.cashEnd !== cf.cashBegin + cf.netChange) p.push(`${ctx}: cashEnd≠begin+net`)
   if (cf.cashEnd !== bs.currentAssets.cash) p.push(`${ctx}: cashEnd≠BS現金`)
   if (cf.cashBegin !== prev.balanceSheet.currentAssets.cash) p.push(`${ctx}: cashBegin≠前期末現金`)
-  // 3) 利益剰余金の繰越（配当導入後は −配当 も考慮する）
-  const expRE = prev.balanceSheet.equity.retainedEarnings + rec.incomeStatement.netIncome
+  // 3) 利益剰余金の繰越（RE[t] = RE[t-1] + 純利益 − 配当）
+  const expRE =
+    prev.balanceSheet.equity.retainedEarnings + rec.incomeStatement.netIncome - (rec.dividendPaid ?? 0)
   if (bs.equity.retainedEarnings !== expRE) p.push(`${ctx}: 利益剰余金繰越ズレ`)
   // 4) P/L 内部整合
   const is = rec.incomeStatement
@@ -92,11 +93,14 @@ function randomDecision(game: GameState, params: SimParams, seed: number, turn: 
     fire: sink ? Math.floor(2 * u(seed, turn, 10)) : u(seed, turn, 10) < 0.1 ? 1 : 0,
     wageLevel: sink ? Math.round(60 + 80 * u(seed, turn, 11)) : 100,
     equityIssuance: sink || u(seed, turn, 12) < 0.15 ? Math.round(200000 * u(seed, turn, 20)) : 0,
+    dividend: sink ? Math.round(20000 * u(seed, turn, 22)) : 0,
     financing: sink
       ? Math.round((u(seed, turn, 13) - 0.5) * 100000)
       : u(seed, turn, 13) < 0.2
         ? Math.round((u(seed, turn, 21) - 0.4) * 80000)
         : 0,
+    // IPO も稀に混ぜてストレス（ゲート未達なら engine が無視するのも含めて検証）。
+    goPublic: sink && u(seed, turn, 23) < 0.04 ? { proceeds: Math.round(500000 * u(seed, turn, 24)) } : undefined,
   }
 }
 

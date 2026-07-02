@@ -17,6 +17,7 @@ const decide = (d: Partial<Decision> = {}): Decision => ({
   fire: 0,
   wageLevel: 100,
   equityIssuance: 0,
+  dividend: 0,
   financing: 0,
   ...d,
 })
@@ -247,6 +248,81 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(r.cashFlow.financing).toBe(500_000) // 借入300,000＋増資200,000
     expect(r.state.balanceSheet.equity.capitalStock).toBe(state.balanceSheet.equity.capitalStock + 200_000)
     expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('配当は剰余金↓・現金↓・財務CF↓（同額減で恒等式維持）', () => {
+    const { initialState, params } = base()
+    const r = resolveTurn(initialState, decide({ produceUnits: 0, dividend: 500_000 }), params)
+    expect(r.dividendPaid).toBe(500_000)
+    expect(r.state.balanceSheet.equity.retainedEarnings).toBe(
+      initialState.balanceSheet.equity.retainedEarnings + r.incomeStatement.netIncome - 500_000,
+    )
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('配当は利益剰余金と期首現金の小さい方まで', () => {
+    const { initialState, params } = base()
+    // BASE_STATE: 剰余金 2,000,000・現金 5,000,000 → 上限は剰余金 2,000,000。
+    const r = resolveTurn(initialState, decide({ produceUnits: 0, dividend: 99_999_999 }), params)
+    expect(r.dividendPaid).toBe(initialState.balanceSheet.equity.retainedEarnings)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('IPO: 上場成立で現金・資本金が同額増・株数増・調達は paidIn に加算・恒等式維持', () => {
+    const { initialState, params } = base()
+    const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
+    // 時価総額 10,000,000 → 公募価格 10,000/株・調達上限 5,000,000（比率0.5）。
+    const r = resolveTurn(state, decide({ produceUnits: 0, goPublic: { proceeds: 2_000_000 } }), params, {
+      ipoValuation: 10_000_000,
+    })
+    expect(r.ipoProceeds).toBe(2_000_000)
+    expect(r.state.listed).toBe(true)
+    expect(r.state.sharesOutstanding).toBe(1_200) // +200株（2,000,000÷10,000）
+    expect(r.state.balanceSheet.equity.capitalStock).toBe(state.balanceSheet.equity.capitalStock + 2_000_000)
+    expect(r.state.paidInSinceStart).toBe(2_000_000)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('IPO: 調達は時価総額×比率でクランプ・不成立条件（株なし/評価0/上場済み）は無視', () => {
+    const { initialState, params } = base()
+    const state: CompanyState = { ...initialState, sharesOutstanding: 1_000 }
+    // クランプ: 9,999,999 希望 → 上限 5,000,000。
+    const clamped = resolveTurn(state, decide({ produceUnits: 0, goPublic: { proceeds: 9_999_999 } }), params, {
+      ipoValuation: 10_000_000,
+    })
+    expect(clamped.ipoProceeds).toBe(5_000_000)
+    // 株式基盤なし → 無視。
+    const noShares = resolveTurn(initialState, decide({ produceUnits: 0, goPublic: { proceeds: 1_000_000 } }), params, {
+      ipoValuation: 10_000_000,
+    })
+    expect(noShares.ipoProceeds).toBe(0)
+    expect(noShares.state.listed).toBeUndefined()
+    // バリュエーション0（赤字）→ 無視。
+    const noVal = resolveTurn(state, decide({ produceUnits: 0, goPublic: { proceeds: 1_000_000 } }), params, {
+      ipoValuation: 0,
+    })
+    expect(noVal.ipoProceeds).toBe(0)
+    // 上場済み → 無視（二重上場しない）。
+    const already = resolveTurn(
+      { ...state, listed: true },
+      decide({ produceUnits: 0, goPublic: { proceeds: 1_000_000 } }),
+      params,
+      { ipoValuation: 10_000_000 },
+    )
+    expect(already.ipoProceeds).toBe(0)
+    expect(already.state.listed).toBe(true)
+  })
+
+  it('上場中は上場維持コストが販管費に乗る（年額を期間スケール）', () => {
+    const { initialState, params } = base()
+    const p = { ...params, listingCost: 120_000 } // 年12万 → 月1万
+    const listedState: CompanyState = { ...initialState, listed: true }
+    const withCost = resolveTurn(listedState, decide({ produceUnits: 0 }), p)
+    const withoutCost = resolveTurn(initialState, decide({ produceUnits: 0 }), p)
+    expect(
+      withCost.incomeStatement.operatingExpenses - withoutCost.incomeStatement.operatingExpenses,
+    ).toBe(10_000)
+    expect(balances(withCost.state.balanceSheet)).toBe(true)
   })
 
   it('株式未設定のシナリオは増資0で sharesOutstanding を未設定のまま保つ（後方互換）', () => {

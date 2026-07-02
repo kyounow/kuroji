@@ -70,6 +70,8 @@ export interface CompanyState {
    * 目標（equityTarget）は「稼いだ純資産」＝純資産−これ で判定する（資本注入で目標を買えないように）。未設定は 0。
    */
   paidInSinceStart?: number
+  /** 上場済みか（IPO後 true）。上場維持コストと知名度ブーストが掛かる。未設定＝未上場。 */
+  listed?: boolean
 }
 
 /** 研究開発の成果として変化する製品パラメータ。 */
@@ -106,8 +108,16 @@ export interface Decision {
   wageLevel: number
   /** 増資額（株式発行。現金↑・資本金↑。無利息だが株数が増え1株価値が薄まる＝希薄化） */
   equityIssuance: number
+  /** 配当（税引後利益の株主還元。利益剰余金↓・現金↓。剰余金と現金の小さい方まで） */
+  dividend: number
   /** 新規借入額（マイナスは返済） */
   financing: number
+  /**
+   * IPO（新規上場・一度きり）。proceeds は公募での調達希望額。
+   * バリュエーション（年間純利益×PER）は呼び出し側が TurnOptions.ipoValuation で注入し、
+   * エンジンは 未上場・株式あり・バリュエーション>0 のときだけ実行する（不可なら無視）。
+   */
+  goPublic?: { proceeds: number }
 }
 
 /** 市況イベント（需要乗数のほか、突発ショックの損失を持てる）。 */
@@ -166,6 +176,11 @@ export interface TurnOptions {
   macroDemandMultiplier?: number
   /** 当期の需要ブレ乗数（確定時のみ。プレビューは未指定＝1で中心値） */
   demandNoise?: number
+  /**
+   * IPO のバリュエーション（時価総額。年間純利益×PER）。履歴の集計が要るため呼び出し側が注入する。
+   * 未指定/0 なら goPublic は実行されない。
+   */
+  ipoValuation?: number
 }
 
 /**
@@ -219,6 +234,10 @@ export interface TurnResult {
   insuranceCoverage: number
   /** 当期に自主退職（待遇悪化による離職）した人数 */
   attritionQuits: number
+  /** 当期に実際に支払った配当（剰余金・現金でクランプ後） */
+  dividendPaid: number
+  /** 当期の IPO 調達額（実行されなければ 0） */
+  ipoProceeds: number
   /** 当期に算出された一時損失（保険前 gross。floor/cap/severity 適用後。バナーの見込み額に使う） */
   shockOneOffLoss: number
   /** 当期に算出された設備毀損（保険前 gross。簿価クリップ後。バナーの見込み額に使う） */
@@ -335,6 +354,21 @@ export interface SimParams {
   // --- 財務・税 ---
   /** 1期に発行できる増資の上限（期首純資産に対する比率＝投資家の受け入れ枠）。未設定は 0.25。 */
   equityIssueCapRatio?: number
+
+  // --- IPO・上場（未設定のシナリオでは上場不可） ---
+  /** バリュエーションの PER（時価総額＝年間純利益×これ）。未設定で IPO 無効。 */
+  earningsMultiple?: number
+  /** IPO で調達できる上限（時価総額に対する比率）。未設定は 0.5。 */
+  ipoMaxRaiseRatio?: number
+  /** 上場維持コスト（年額。監査・IR 等。上場中は毎期 opEx に計上・物価連動） */
+  listingCost?: number
+  /** 上場による知名度の需要ブースト（例 0.1 = +10%。上場中ずっと） */
+  listingDemandBoost?: number
+  /** 上場基準: 必要純資産 */
+  ipoEquityThreshold?: number
+  /** 上場基準: 直近の連続黒字月数。未設定は 6。 */
+  ipoProfitablePeriods?: number
+
   /** 有利子負債（期首）に対する銀行スプレッド（政策金利に上乗せ） */
   interestRate: number
   /** 法人税の実効税率（暫定フラット。のち出典付きテーブル化） */

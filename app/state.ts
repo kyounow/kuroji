@@ -7,6 +7,7 @@ import {
   competitorAt,
   shareMultiplier,
   productFromRd,
+  ipoValuation,
   evaluateGoal,
   initialMacro,
   advanceMacro,
@@ -60,6 +61,8 @@ export interface TurnRecord {
   unitsSold: number
   /** 当期の原材料スポット単価（実効仕入原価） */
   effectiveUnitCost: number
+  /** 当期に支払った配当（クランプ後。利益剰余金の繰越検証・診断に使う） */
+  dividendPaid?: number
   incomeStatement: IncomeStatement
   cashFlow: CashFlowStatement
   ratios: Ratios
@@ -122,6 +125,7 @@ export function defaultDecision(scenarioId: string): Decision {
     fire: 0,
     wageLevel: 100,
     equityIssuance: 0,
+    dividend: 0,
     financing: 0,
   }
 }
@@ -170,6 +174,9 @@ function turnOptionsFor(game: GameState, decision: Decision, eventOverride?: Mar
   const comp = competitorAt(scenario.params, game.seed, game.current.turn)
   const ourQuality = productFromRd(game.current.rdStock, scenario.params).demandModifier
   const demandShareMultiplier = shareMultiplier(decision.unitPrice, ourQuality, comp, scenario.params)
+  // IPO のバリュエーション（直近1年の純利益×PER）。履歴の集計が要るためここで注入する（決定論・プレビューも同値）。
+  const ppy = scenario.params.periodsPerYear ?? 1
+  const annualNetIncome = game.history.slice(-ppy).reduce((s, h) => s + h.incomeStatement.netIncome, 0)
   return {
     demandMultiplier: event.demandMultiplier,
     nextMaterialIndex,
@@ -183,6 +190,7 @@ function turnOptionsFor(game: GameState, decision: Decision, eventOverride?: Mar
     policyRate: game.macro.policyRate,
     inflationIndex: game.macro.inflationIndex,
     macroDemandMultiplier: cycleDemandMultiplier(game.macro),
+    ipoValuation: ipoValuation(annualNetIncome, scenario.params.earningsMultiple ?? 0),
   }
 }
 
@@ -285,6 +293,7 @@ export function advanceTurn(game: GameState, decision: Decision): GameState {
     decision,
     unitsSold: result.unitsSold,
     effectiveUnitCost: result.effectiveUnitCost,
+    dividendPaid: result.dividendPaid > 0 ? result.dividendPaid : undefined,
     incomeStatement: result.incomeStatement,
     cashFlow: result.cashFlow,
     ratios: computeRatios(result.state.balanceSheet, result.incomeStatement),

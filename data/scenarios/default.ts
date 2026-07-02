@@ -78,6 +78,13 @@ export const defaultScenario: Scenario = {
     // 財務・税
     interestRate: 0.02, // 政策金利への銀行スプレッド
     effectiveTaxRate: 0.3,
+    // IPO・上場（町工場でも成長すれば上場できる。PERは製造業の控えめな水準）
+    earningsMultiple: 12, // 時価総額＝年間純利益×12
+    ipoMaxRaiseRatio: 0.5, // 公募調達は時価総額の50%まで
+    listingCost: 60_000, // 上場維持コスト（年額。監査・IR）
+    listingDemandBoost: 0.08, // 上場の知名度で需要+8%
+    ipoEquityThreshold: 1_000_000, // 純資産100万円以上
+    ipoProfitablePeriods: 6, // 直近6ヶ月連続黒字
     // マクロ経済
     inflationTarget: 0.02,
     policyNeutralRate: 0.01,
@@ -90,4 +97,5 @@ export const defaultScenario: Scenario = {
     target: 1_500_000,
     withinTurns: 96,
   },
+  enabledOneTimeActions: ['ipo'],
 }

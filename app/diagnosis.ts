@@ -34,13 +34,20 @@ export function diagnoseGame(game: GameState): Diagnosis {
   if (game.outcome === 'lost') {
     // 倒産していない（生存したが期限内に目標未達）
     if (cash >= 0 && equity >= 0) {
+      const totalDividends = hist.reduce((s, h) => s + (h.dividendPaid ?? 0), 0)
+      const points = [
+        'あと少し、純資産を伸ばすペースが必要でした。',
+        '販促・研究開発で需要を伸ばす、設備投資・雇用で生産能力を広げるなど、成長への投資を。',
+      ]
+      if (totalDividends > 0) {
+        points.push(
+          `配当を計 ¥${Math.round(totalDividends).toLocaleString('ja-JP')} 支払いました。目標達成を優先するなら内部留保（再投資）も検討を（配当政策のトレードオフ）。`,
+        )
+      }
+      points.push('エンドレスモードなら期限なしでじっくり経営できます。')
       return {
         headline: '期限内に目標を達成できませんでした（倒産はしていません）。',
-        points: [
-          'あと少し、純資産を伸ばすペースが必要でした。',
-          '販促・研究開発で需要を伸ばす、設備投資・雇用で生産能力を広げるなど、成長への投資を。',
-          'エンドレスモードなら期限なしでじっくり経営できます。',
-        ],
+        points,
       }
     }
     // 現金が尽きた（純資産はプラス＝黒字倒産の可能性）
