@@ -33,6 +33,12 @@ export const cafeScenario: Scenario = {
     priceElasticity: 1.5,
     competitorStrength: 0.4,
     demandNoise: 0.08, // 来客数は日々少しブレる（±8%）
+    // 複数製品ライン（キッチンとスタッフは共有＝メニュー構成が経営判断に）
+    productLines: [
+      { id: 'drink', name: 'ドリンク', baseDemand: 3_000, basePrice: 500, priceElasticity: 1.5, unitVariableCost: 200 },
+      // フード: 客単価が高く粗利も厚いが、仕込みに同じキッチン能力を使う。
+      { id: 'food', name: 'フード', baseDemand: 600, basePrice: 900, priceElasticity: 1.2, unitVariableCost: 450 },
+    ],
     capacityPerEquipment: 0.0075, // 店舗40万 → 年間来客3,000 → 月次250
     scaleEconomyMax: 0.1,
     scaleEconomyHalf: 2_000_000,

@@ -423,6 +423,94 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(withBoost.demand).toBeGreaterThan(without.demand)
   })
 
+  it('複数製品: 2ラインで恒等式・B/S在庫＝Σ(lines)・ライン別の価値保存が成立', () => {
+    const { initialState, params } = base()
+    const p: SimParams = {
+      ...params,
+      productLines: [
+        { id: 'std', name: '標準品', baseDemand: 1_000, basePrice: 2_000, priceElasticity: 1.2, unitVariableCost: 1_000 },
+        { id: 'prm', name: '高級品', baseDemand: 300, basePrice: 5_000, priceElasticity: 1.0, unitVariableCost: 2_000 },
+      ],
+    }
+    const r = resolveTurn(
+      initialState,
+      decide({
+        lines: [
+          { unitPrice: 2_000, purchaseMaterials: 100, produceUnits: 100, marketingSpend: 0, rdSpend: 50_000 },
+          { unitPrice: 5_000, purchaseMaterials: 50, produceUnits: 50, marketingSpend: 20_000, rdSpend: 0 },
+        ],
+      }),
+      p,
+    )
+    const lines = r.state.lines ?? []
+    expect(lines).toHaveLength(2)
+    // B/S の在庫＝ライン合算（スカラーも同値＝導出値）
+    expect(r.state.balanceSheet.currentAssets.rawMaterials).toBe(lines.reduce((s, l) => s + l.materialValue, 0))
+    expect(r.state.balanceSheet.currentAssets.finishedGoods).toBe(lines.reduce((s, l) => s + l.finishedValue, 0))
+    expect(r.state.materialUnits).toBe(lines.reduce((s, l) => s + l.materialUnits, 0))
+    expect(r.state.finishedUnits).toBe(lines.reduce((s, l) => s + l.finishedUnits, 0))
+    expect(r.state.rdStock).toBe(lines.reduce((s, l) => s + l.rdStock, 0))
+    // 全社 P/L はライン合算
+    expect(r.incomeStatement.revenue).toBe(r.lineResults.reduce((s, l) => s + l.revenue, 0))
+    expect(r.incomeStatement.costOfGoodsSold).toBe(r.lineResults.reduce((s, l) => s + l.costOfGoodsSold, 0))
+    // 恒等式（tolerance 0）
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('複数製品: 共有能力は希望比で按分され Σ生産 ≤ 能力（floor＋剰余ライン順＝決定論）', () => {
+    const { initialState, params } = base()
+    const p: SimParams = {
+      ...params,
+      capacityPerEquipment: 0.000453, // 設備4,000,000 → 月次能力 floor(1812/12)=151
+      productLines: [
+        { id: 'a', name: 'A', baseDemand: 1_000, basePrice: 2_000, priceElasticity: 1.2, unitVariableCost: 1_000 },
+        { id: 'b', name: 'B', baseDemand: 1_000, basePrice: 2_000, priceElasticity: 1.2, unitVariableCost: 1_000 },
+      ],
+    }
+    const mk = () =>
+      resolveTurn(
+        initialState,
+        decide({
+          lines: [
+            { unitPrice: 2_000, purchaseMaterials: 100, produceUnits: 100, marketingSpend: 0, rdSpend: 0 },
+            { unitPrice: 2_000, purchaseMaterials: 100, produceUnits: 100, marketingSpend: 0, rdSpend: 0 },
+          ],
+        }),
+        p,
+      )
+    const r = mk()
+    // 希望 100+100 > 能力151 → floor(75.5)=75ずつ、剰余1はライン0へ → 76+75=151
+    const produced0 = (r.state.lines?.[0]?.finishedUnits ?? 0) + r.lineResults[0].unitsSold - initialStateLineFin(initialState)
+    const producedTotal =
+      r.lineResults.reduce((s, l) => s + l.availableToSell, 0) -
+      Math.max(0, initialState.finishedUnits) // 期首製品を除いた当期生産分
+    expect(producedTotal).toBe(151)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+    // 決定論（同入力→同結果）
+    expect(JSON.stringify(mk())).toBe(JSON.stringify(r))
+    // ヘルパ（ライン0の期首製品数）
+    function initialStateLineFin(s: CompanyState): number {
+      return Math.max(0, s.finishedUnits)
+    }
+    void produced0
+  })
+
+  it('複数製品: Decision.lines 未指定なら従来スカラーがライン0に適用され、他ラインは休止', () => {
+    const { initialState, params } = base()
+    const p: SimParams = {
+      ...params,
+      productLines: [
+        { id: 'std', name: '標準品', baseDemand: 1_000, basePrice: 2_000, priceElasticity: 1.2, unitVariableCost: 1_000 },
+        { id: 'prm', name: '高級品', baseDemand: 300, basePrice: 5_000, priceElasticity: 1.0, unitVariableCost: 2_000 },
+      ],
+    }
+    const r = resolveTurn(initialState, decide({ unitPrice: 2_500, purchaseMaterials: 80, produceUnits: 60 }), p)
+    expect(r.lineResults[1].unitsSold).toBe(0)
+    expect(r.lineResults[1].revenue).toBe(0)
+    expect(r.incomeStatement.revenue).toBe(r.lineResults[0].revenue)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
   it('株式未設定のシナリオは増資0で sharesOutstanding を未設定のまま保つ（後方互換）', () => {
     const { initialState, params } = base()
     // initialState は sharesOutstanding を持たない（undefined）

@@ -6,6 +6,10 @@ import type {
   SimParams,
   TurnOptions,
   TurnResult,
+  ProductLineParams,
+  ProductLineState,
+  LineDecision,
+  LineResult,
 } from '@core/types'
 import { demandAt } from '@core/market/demand'
 import { productFromRd } from '@core/product/research'
@@ -45,7 +49,6 @@ export function resolveTurn(
   options: TurnOptions = {},
 ): TurnResult {
   const bs = state.balanceSheet
-  const product = productFromRd(state.rdStock, params)
   // 1ターンの長さ（年→期間）。流量はこの係数でスケールする。
   const ppy = params.periodsPerYear ?? 1
   const periodFactor = 1 / ppy
@@ -75,19 +78,7 @@ export function resolveTurn(
   const attritionQuits = Math.round(headcountAfterDecision * quitRate + 1e-9)
   const headcount = Math.max(0, headcountAfterDecision - attritionQuits)
 
-  // 当期の原材料スポット単価（物価 × 市況 × R&D 原価改善 × 設備の規模の経済）
-  const spotCost = Math.max(
-    0,
-    Math.round(
-      params.unitVariableCost *
-        inflationIndex *
-        state.materialIndex *
-        product.unitCostModifier *
-        costEfficiency(opEquipment, params),
-    ),
-  )
-
-  // 当期の生産能力＝設備能力と労働能力の小さい方（設備か人手のボトルネック）。
+  // 当期の生産能力＝設備能力と労働能力の小さい方（設備か人手のボトルネック）。全ライン共有。
   const capacity = Math.min(
     productionCapacity(opEquipment, params, periodFactor),
     laborCapacity(headcount, params, periodFactor),
@@ -98,66 +89,193 @@ export function resolveTurn(
   const arBegin = bs.currentAssets.accountsReceivable
   const rawValBegin = bs.currentAssets.rawMaterials
   const finValBegin = bs.currentAssets.finishedGoods
-  const rawUnitsBegin = Math.max(0, state.materialUnits)
-  const finUnitsBegin = Math.max(0, state.finishedUnits)
   const apBegin = bs.currentLiabilities.accountsPayable
 
-  // --- ① 原材料の仕入（スポット単価で原材料在庫へ、移動平均） ---
-  const purchaseUnits = Math.max(0, decision.purchaseMaterials)
-  const purchaseCost = spotCost * purchaseUnits
-  const rawUnitsAfterBuy = rawUnitsBegin + purchaseUnits
-  const rawValAfterBuy = rawValBegin + purchaseCost
-  const rawAvg = rawUnitsAfterBuy > 0 ? rawValAfterBuy / rawUnitsAfterBuy : 0
+  // === 製品ライン（複数製品）。lines が真実源＝単一製品も「1ラインのループ」として同じ経路を通る ===
+  // ライン定義: 未指定シナリオは従来パラメータの単一ライン。
+  const lineDefs: ProductLineParams[] = params.productLines?.length
+    ? params.productLines
+    : [
+        {
+          id: 'main',
+          name: '主力製品',
+          baseDemand: params.baseDemand,
+          basePrice: params.basePrice,
+          priceElasticity: params.priceElasticity,
+          unitVariableCost: params.unitVariableCost,
+        },
+      ]
+  // ライン状態: 未保持（従来セーブ・初期状態）はライン0にスカラー在庫/累積R&Dを包む（移行不要の後方互換）。
+  const linesBegin: ProductLineState[] = lineDefs.map((_, i) => {
+    const held = state.lines?.[i]
+    if (held) return held
+    if (i === 0) {
+      return {
+        materialUnits: Math.max(0, state.materialUnits),
+        materialValue: bs.currentAssets.rawMaterials,
+        finishedUnits: Math.max(0, state.finishedUnits),
+        finishedValue: bs.currentAssets.finishedGoods,
+        rdStock: state.rdStock,
+      }
+    }
+    return { materialUnits: 0, materialValue: 0, finishedUnits: 0, finishedValue: 0, rdStock: 0 }
+  })
+  // ライン判断: 未指定なら従来のスカラー判断をライン0に適用（他ラインは休止）。
+  const lineDecs: LineDecision[] = lineDefs.map((lp, i) => {
+    const given = decision.lines?.[i]
+    if (given) return given
+    if (i === 0) {
+      return {
+        unitPrice: decision.unitPrice,
+        purchaseMaterials: decision.purchaseMaterials,
+        produceUnits: decision.produceUnits,
+        marketingSpend: decision.marketingSpend,
+        rdSpend: decision.rdSpend,
+      }
+    }
+    return { unitPrice: lp.basePrice, purchaseMaterials: 0, produceUnits: 0, marketingSpend: 0, rdSpend: 0 }
+  })
 
-  // --- ② 生産（手持ち原材料が上限。原材料→製品へ価値保存の振替） ---
-  // 生産は「希望数量・手持ち原材料・生産能力」のうち最小まで。
-  const produced = Math.min(Math.max(0, decision.produceUnits), rawUnitsAfterBuy, capacity)
-  const consumedRawValue = Math.round(produced * rawAvg)
-  const rawUnitsEnd = rawUnitsAfterBuy - produced
-  const rawValEnd = rawValAfterBuy - consumedRawValue
-  const finUnitsAfterProduce = finUnitsBegin + produced
-  const finValAfterProduce = finValBegin + consumedRawValue
-  const finAvg = finUnitsAfterProduce > 0 ? finValAfterProduce / finUnitsAfterProduce : 0
+  // --- ① ライン別の仕入（移動平均）と生産希望（能力按分の入力） ---
+  const works = lineDefs.map((lp, i) => {
+    const st = linesBegin[i]
+    const dec = lineDecs[i]
+    // ライン別 R&D → 製品パラメータ（rd 係数はライン上書き可・未指定は全社値）。
+    const lineProduct = productFromRd(st.rdStock, {
+      ...params,
+      rdCostReductionMax: lp.rdCostReductionMax ?? params.rdCostReductionMax,
+      rdDemandBoostMax: lp.rdDemandBoostMax ?? params.rdDemandBoostMax,
+      rdHalf: lp.rdHalf ?? params.rdHalf,
+    })
+    // ライン別スポット単価（物価 × 市況 × ラインR&D原価改善 × 設備の規模の経済）。市況指数は全社1本。
+    const spotCost = Math.max(
+      0,
+      Math.round(
+        lp.unitVariableCost *
+          inflationIndex *
+          state.materialIndex *
+          lineProduct.unitCostModifier *
+          costEfficiency(opEquipment, params),
+      ),
+    )
+    const purchaseUnits = Math.max(0, dec.purchaseMaterials)
+    const purchaseCost = spotCost * purchaseUnits
+    const rawUnitsAfterBuy = st.materialUnits + purchaseUnits
+    const rawValAfterBuy = st.materialValue + purchaseCost
+    const rawAvg = rawUnitsAfterBuy > 0 ? rawValAfterBuy / rawUnitsAfterBuy : 0
+    // 生産希望＝希望数量と手持ち原材料の小さい方（能力は次段で按分）。
+    const want = Math.min(Math.max(0, dec.produceUnits), rawUnitsAfterBuy)
+    return { lp, st, dec, lineProduct, spotCost, purchaseUnits, purchaseCost, rawUnitsAfterBuy, rawValAfterBuy, rawAvg, want }
+  })
 
-  // --- ③ 需要と販売（製品在庫から） ---
+  // --- 共有能力の按分（希望比で floor → 剰余はライン順に+1 ＝ 決定論・Σ≤capacity） ---
+  const totalWant = works.reduce((s, w) => s + w.want, 0)
+  const alloc = works.map((w) =>
+    !Number.isFinite(capacity) || totalWant <= capacity ? w.want : Math.floor((capacity * w.want) / totalWant),
+  )
+  if (Number.isFinite(capacity) && totalWant > capacity) {
+    let rest = capacity - alloc.reduce((s, a) => s + a, 0)
+    for (let i = 0; i < alloc.length && rest > 0; i++) {
+      if (alloc[i] < works[i].want) {
+        alloc[i]++
+        rest--
+      }
+    }
+  }
+
+  // --- ②③ ライン別の生産（価値保存の振替）と販売。全社集計を積み上げる ---
   const demandMultiplier = options.demandMultiplier ?? 1
   const shareMultiplier = options.demandShareMultiplier ?? 1
   // 需要ブレ（確定時のみ。プレビューは未指定＝1で中心値）。実際の販売に不確実性を持たせる。
   const demandNoise = options.demandNoise ?? 1
-  // 全社レベルの需要乗数（上場の知名度・買収した顧客基盤）。単一の適用点＝製品ライン別化しても一括で掛ける。
+  // 全社レベルの需要乗数（上場の知名度・買収した顧客基盤）。単一の適用点で全ラインに掛ける。
   const companyDemandMultiplier =
     (state.listed ? 1 + (params.listingDemandBoost ?? 0) : 1) *
     (state.acquiredCompetitor ? 1 + (params.acqTargetDemandBoost ?? 0) : 1)
-  // 物価上昇時に名目価格を据え置くと実質値下げ→需要増（unitPrice を物価で割る）。
-  const rawDemand = demandAt(decision.unitPrice / inflationIndex, params)
-  const demand = Math.max(
-    0,
-    Math.round(
-      rawDemand *
-        marketingMultiplier(decision.marketingSpend, params) *
-        demandMultiplier *
-        macroDemandMultiplier *
-        companyDemandMultiplier *
-        product.demandModifier *
-        shareMultiplier *
-        periodFactor *
-        demandNoise,
-    ),
-  )
-  const availableToSell = finUnitsAfterProduce
-  const unitsSold = Math.min(demand, availableToSell)
-  const revenue = Math.round(decision.unitPrice * unitsSold)
-  const costOfGoodsSold = Math.round(unitsSold * finAvg)
-  const finUnitsEnd = finUnitsAfterProduce - unitsSold
-  const finValEnd = finValAfterProduce - costOfGoodsSold
+
+  const linesEnd: ProductLineState[] = []
+  const lineResults: LineResult[] = []
+  let purchaseCost = 0
+  let revenue = 0
+  let costOfGoodsSold = 0
+  let unitsSold = 0
+  let demand = 0
+  let availableToSell = 0
+  let marketingSpendTotal = 0
+  let rdSpendTotal = 0
+  works.forEach((w, i) => {
+    const produced = Math.min(w.want, alloc[i])
+    const consumedRawValue = Math.round(produced * w.rawAvg)
+    const finUnitsAfterProduce = w.st.finishedUnits + produced
+    const finValAfterProduce = w.st.finishedValue + consumedRawValue // 価値保存の振替（恒等式の要）
+    const finAvg = finUnitsAfterProduce > 0 ? finValAfterProduce / finUnitsAfterProduce : 0
+    // 物価上昇時に名目価格を据え置くと実質値下げ→需要増（unitPrice を物価で割る）。
+    const rawDemand = demandAt(w.dec.unitPrice / inflationIndex, {
+      ...params,
+      baseDemand: w.lp.baseDemand,
+      basePrice: w.lp.basePrice,
+      priceElasticity: w.lp.priceElasticity,
+    })
+    const lineDemand = Math.max(
+      0,
+      Math.round(
+        rawDemand *
+          marketingMultiplier(w.dec.marketingSpend, params) *
+          demandMultiplier *
+          macroDemandMultiplier *
+          companyDemandMultiplier *
+          w.lineProduct.demandModifier *
+          shareMultiplier *
+          periodFactor *
+          demandNoise,
+      ),
+    )
+    const sold = Math.min(lineDemand, finUnitsAfterProduce)
+    const lineRevenue = Math.round(w.dec.unitPrice * sold)
+    const lineCOGS = Math.round(sold * finAvg)
+    linesEnd.push({
+      materialUnits: w.rawUnitsAfterBuy - produced,
+      materialValue: w.rawValAfterBuy - consumedRawValue,
+      finishedUnits: finUnitsAfterProduce - sold,
+      finishedValue: finValAfterProduce - lineCOGS,
+      rdStock: w.st.rdStock + Math.max(0, w.dec.rdSpend),
+    })
+    lineResults.push({
+      id: w.lp.id,
+      name: w.lp.name,
+      demand: lineDemand,
+      unitsSold: sold,
+      revenue: lineRevenue,
+      costOfGoodsSold: lineCOGS,
+      availableToSell: finUnitsAfterProduce,
+      effectiveUnitCost: w.spotCost,
+    })
+    purchaseCost += w.purchaseCost
+    revenue += lineRevenue
+    costOfGoodsSold += lineCOGS
+    unitsSold += sold
+    demand += lineDemand
+    availableToSell += finUnitsAfterProduce
+    marketingSpendTotal += Math.max(0, w.dec.marketingSpend)
+    rdSpendTotal += Math.max(0, w.dec.rdSpend)
+  })
+  // 全社集計（B/S・在庫Δに使う。スカラーの materialUnits 等は以後 Σ(lines) の導出値として書く）
+  const rawUnitsEnd = linesEnd.reduce((s, l) => s + l.materialUnits, 0)
+  const rawValEnd = linesEnd.reduce((s, l) => s + l.materialValue, 0)
+  const finUnitsEnd = linesEnd.reduce((s, l) => s + l.finishedUnits, 0)
+  const finValEnd = linesEnd.reduce((s, l) => s + l.finishedValue, 0)
+  const rdStockEnd = linesEnd.reduce((s, l) => s + l.rdStock, 0)
+  const spotCost = lineResults[0]?.effectiveUnitCost ?? 0
+  const product = works[0]?.lineProduct ?? productFromRd(state.rdStock, params)
 
   // --- 損益計算書（P/L） ---
   const grossProfit = revenue - costOfGoodsSold
   // 固定費（物価で増減）・減価償却は年額を期間でスケール。
   const fixedCosts = Math.round(params.fixedCosts * inflationIndex * periodFactor)
   const depreciation = Math.round(bs.fixedAssets.equipment * params.depreciationRate * periodFactor)
-  const marketingSpend = Math.max(0, decision.marketingSpend)
-  const rdSpend = Math.max(0, decision.rdSpend)
+  // 販促・R&D はライン別支出の合計（単一製品はライン0＝従来スカラーと同値）。
+  const marketingSpend = marketingSpendTotal
+  const rdSpend = rdSpendTotal
   const insuranceSpend = Math.max(0, decision.insuranceSpend)
   const maintenanceSpend = Math.max(0, decision.maintenanceSpend)
   // 人件費＝従業員数 × 市場賃金(wage×物価指数) × 給与水準。未設定の wage は労働モデル無効＝0。
@@ -365,10 +483,12 @@ export function resolveTurn(
   // --- 期末の貸借対照表（B/S）と状態 ---
   const nextState: CompanyState = {
     turn: state.turn + 1,
+    // スカラーは Σ(lines) の導出値（lines が真実源。ドリフト不可能＝毎期ここで上書き）。
     materialUnits: rawUnitsEnd,
     finishedUnits: finUnitsEnd,
     materialIndex: options.nextMaterialIndex ?? state.materialIndex,
-    rdStock: state.rdStock + rdSpend,
+    rdStock: rdStockEnd,
+    lines: linesEnd,
     condition: conditionNext,
     // 買収で受け入れた人員は期末に合流（翌期から人件費・労働能力に反映）。
     headcount: headcount + acqHeads,
@@ -436,6 +556,7 @@ export function resolveTurn(
     ipoProceeds,
     goodwillAmortized: goodwillAmort,
     acquisitionConsideration,
+    lineResults,
     shockOneOffLoss: oneOffLoss,
     shockEquipmentWritedown: equipmentWritedown,
     capacity,

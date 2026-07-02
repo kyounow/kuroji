@@ -70,6 +70,21 @@ function checkRecord(rec: GameState['history'][number], prev: GameState['current
   if ((s.headcount ?? 0) < 0) p.push(`${ctx}: 従業員数<0`)
   if (is.revenue < 0) p.push(`${ctx}: 売上<0`)
   if (is.costOfGoodsSold < 0) p.push(`${ctx}: 売上原価<0`)
+  // 7) 複数製品: スカラー在庫・R&D は Σ(lines) の導出値（ドリフト検出）
+  if (s.lines?.length) {
+    const sum = (f: (l: NonNullable<typeof s.lines>[number]) => number) => s.lines!.reduce((x, l) => x + f(l), 0)
+    if (sum((l) => l.materialUnits) !== s.materialUnits) p.push(`${ctx}: materialUnits≠Σlines`)
+    if (sum((l) => l.finishedUnits) !== s.finishedUnits) p.push(`${ctx}: finishedUnits≠Σlines`)
+    if (sum((l) => l.rdStock) !== s.rdStock) p.push(`${ctx}: rdStock≠Σlines`)
+    if (sum((l) => l.materialValue) !== bs.currentAssets.rawMaterials) p.push(`${ctx}: rawMaterials≠Σlines`)
+    if (sum((l) => l.finishedValue) !== bs.currentAssets.finishedGoods) p.push(`${ctx}: finishedGoods≠Σlines`)
+    for (const l of s.lines) {
+      if (l.materialUnits < 0 || l.finishedUnits < 0 || l.materialValue < 0 || l.finishedValue < 0) {
+        p.push(`${ctx}: ライン在庫に負値`)
+        break
+      }
+    }
+  }
   return p
 }
 
@@ -109,6 +124,16 @@ function randomDecision(game: GameState, params: SimParams, seed: number, turn: 
             stockValue: Math.round(200000 * u(seed, turn, 28)),
           }
         : undefined,
+    // 複数製品シナリオはライン別のランダム判断でストレス（単一製品は undefined＝従来スカラー経路）。
+    lines: params.productLines?.length
+      ? params.productLines.map((lp, i) => ({
+          unitPrice: Math.round(lp.basePrice * (0.7 + 0.8 * u(seed, turn, 30 + i * 6))),
+          purchaseMaterials: Math.round((lp.baseDemand / ppy) * (0.3 + 1.4 * u(seed, turn, 31 + i * 6))),
+          produceUnits: Math.round((lp.baseDemand / ppy) * (0.3 + 1.4 * u(seed, turn, 32 + i * 6))),
+          marketingSpend: sink ? Math.round((params.marketingHalf ?? 30000) * 0.5 * u(seed, turn, 33 + i * 6)) : 0,
+          rdSpend: sink ? Math.round((params.rdHalf ?? 300000) * 0.03 * u(seed, turn, 34 + i * 6)) : 0,
+        }))
+      : undefined,
   }
 }
 

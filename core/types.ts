@@ -76,6 +76,59 @@ export interface CompanyState {
   listed?: boolean
   /** 競合を買収済みか（M&A後 true）。シェア争いが消え、買収ブーストが掛かる。未設定＝未買収。 */
   acquiredCompetitor?: boolean
+  /**
+   * 製品ライン別の内訳（複数製品シナリオ）。**エンジンのループはこれが真実源**で、
+   * materialUnits / finishedUnits / rdStock と B/S の在庫評価額は毎期 Σ(lines) として書かれる導出値。
+   * 未設定（従来セーブ・単一製品）はエンジン入口でライン0に包んで処理する（後方互換・移行不要）。
+   */
+  lines?: ProductLineState[]
+}
+
+/** 製品ラインの定義（複数製品）。未指定シナリオは従来の単一製品（SimParams 直下の値）で動く。 */
+export interface ProductLineParams {
+  id: string
+  /** 表示名（例: 標準品／高級品） */
+  name: string
+  /** このラインの基準需要（年額） */
+  baseDemand: number
+  basePrice: number
+  priceElasticity: number
+  unitVariableCost: number
+  /** ライン別 R&D の効き（未指定は全社値を使用） */
+  rdCostReductionMax?: number
+  rdDemandBoostMax?: number
+  rdHalf?: number
+}
+
+/** 製品ラインの状態（在庫の数量×評価額と累積R&D）。B/S の在庫は全ラインの合算。 */
+export interface ProductLineState {
+  materialUnits: number
+  materialValue: number
+  finishedUnits: number
+  finishedValue: number
+  rdStock: number
+}
+
+/** ライン別の経営判断（価格・仕入・生産・販促・R&D）。 */
+export interface LineDecision {
+  unitPrice: number
+  purchaseMaterials: number
+  produceUnits: number
+  marketingSpend: number
+  rdSpend: number
+}
+
+/** ライン別のターン結果（UI 表示・診断用）。 */
+export interface LineResult {
+  id: string
+  name: string
+  demand: number
+  unitsSold: number
+  revenue: number
+  costOfGoodsSold: number
+  availableToSell: number
+  /** 当期のライン別スポット単価 */
+  effectiveUnitCost: number
 }
 
 /** 研究開発の成果として変化する製品パラメータ。 */
@@ -128,6 +181,11 @@ export interface Decision {
    * 対価合計が受入純資産（acqTargetNetAssets）未満なら不成立（負ののれんは扱わない）。
    */
   acquire?: { cashPaid: number; debtRaised: number; stockValue: number }
+  /**
+   * ライン別の判断（productLines と同順）。複数製品シナリオの UI が供給する。
+   * 未指定なら従来のスカラー判断（unitPrice 等）をライン0に適用し、他ラインは休止。
+   */
+  lines?: LineDecision[]
 }
 
 /** 市況イベント（需要乗数のほか、突発ショックの損失を持てる）。 */
@@ -258,6 +316,8 @@ export interface TurnResult {
   shockEquipmentWritedown: number
   /** 当期の生産能力（数量上限。無制限なら Infinity） */
   capacity: number
+  /** ライン別の結果（単一製品でも1要素）。UI のライン別表示・診断に使う。 */
+  lineResults: LineResult[]
 }
 
 /**
@@ -382,6 +442,10 @@ export interface SimParams {
   ipoEquityThreshold?: number
   /** 上場基準: 直近の連続黒字月数。未設定は 6。 */
   ipoProfitablePeriods?: number
+
+  // --- 複数製品ライン（未指定は単一製品＝上記の baseDemand/basePrice 等をそのまま使用） ---
+  /** 製品ラインの定義。2本以上で複数製品モード（UI もライン別入力になる）。 */
+  productLines?: ProductLineParams[]
 
   // --- M&A（競合の買収。未設定のシナリオでは買収不可） ---
   /** 買収ターゲットの受入純資産（＝受け入れる設備の簿価。対価との差がのれんになる） */

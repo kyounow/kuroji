@@ -11,6 +11,10 @@ export type {
   TurnOptions,
   MarketEvent,
   ProductState,
+  ProductLineParams,
+  ProductLineState,
+  LineDecision,
+  LineResult,
   Goal,
   GoalStatus,
 } from './types'

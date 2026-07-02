@@ -36,6 +36,12 @@ export const defaultScenario: Scenario = {
     priceElasticity: 1.2,
     competitorStrength: 0.3,
     demandNoise: 0.06, // 実需の月々の小さなブレ±6%（大きな変動は景気局面が担う）
+    // 複数製品ライン（能力は共有＝どちらを作るかの配分が新しい経営判断になる）
+    productLines: [
+      { id: 'std', name: '標準品', baseDemand: 600, basePrice: 1_000, priceElasticity: 1.2, unitVariableCost: 520 },
+      // 高級品: 少量・高単価・高粗利。ただし共有能力を食うので標準品との配分がトレードオフ。
+      { id: 'premium', name: '高級品', baseDemand: 96, basePrice: 2_400, priceElasticity: 0.9, unitVariableCost: 1_200, rdDemandBoostMax: 0.7 },
+    ],
     // 設備・生産能力
     capacityPerEquipment: 0.002, // 設備30万 → 年間能力600 → 月次50
     scaleEconomyMax: 0.2,

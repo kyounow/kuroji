@@ -111,7 +111,18 @@ function evalGoal(
  */
 export function defaultDecision(scenarioId: string): Decision {
   const { params } = getScenario(scenarioId)
-  const perPeriod = Math.round(params.baseDemand / (params.periodsPerYear ?? 1))
+  const ppy = params.periodsPerYear ?? 1
+  const perPeriod = Math.round(params.baseDemand / ppy)
+  // 複数製品シナリオはライン別の既定値（各ラインの基準需要ぶんを仕入・生産）。
+  const lines = params.productLines?.length
+    ? params.productLines.map((lp) => ({
+        unitPrice: lp.basePrice,
+        purchaseMaterials: Math.round(lp.baseDemand / ppy),
+        produceUnits: Math.round(lp.baseDemand / ppy),
+        marketingSpend: 0,
+        rdSpend: 0,
+      }))
+    : undefined
   return {
     unitPrice: params.basePrice,
     purchaseMaterials: perPeriod,
@@ -127,6 +138,7 @@ export function defaultDecision(scenarioId: string): Decision {
     equityIssuance: 0,
     dividend: 0,
     financing: 0,
+    lines,
   }
 }
 
@@ -172,7 +184,7 @@ function turnOptionsFor(game: GameState, decision: Decision, eventOverride?: Mar
     game.current.turn,
   )
   const comp = competitorAt(scenario.params, game.seed, game.current.turn)
-  const ourQuality = productFromRd(game.current.rdStock, scenario.params).demandModifier
+  const ourQuality = companyQuality(game)
   // 競合を買収済みならシェアの取り合いは消滅（乗数1）。ブースト分はエンジン側 companyDemandMultiplier が担う。
   const demandShareMultiplier = game.current.acquiredCompetitor
     ? 1
@@ -231,11 +243,33 @@ function breakdownFireRate(game: GameState): number {
   return clamp01(p.breakdownBaseRate * (1 - (p.conditionShield ?? 0) * condition))
 }
 
-/** リコールが「引かれた」期の発火率（製品品質が高いほど低い）。未設定で 1＝常に発火。 */
+/**
+ * 全社の製品品質＝**最弱ラインの品質**（複数製品時）。
+ * 弱い製品が1つでもあるとリコールリスクとブランドはそこに引きずられる、という学び。単一製品は従来どおり。
+ */
+function companyQuality(game: GameState): number {
+  const p = getScenario(game.scenarioId).params
+  const lines = game.current.lines
+  if (p.productLines?.length && lines?.length) {
+    return Math.min(
+      ...p.productLines.map((lp, i) =>
+        productFromRd(lines[i]?.rdStock ?? 0, {
+          ...p,
+          rdCostReductionMax: lp.rdCostReductionMax ?? p.rdCostReductionMax,
+          rdDemandBoostMax: lp.rdDemandBoostMax ?? p.rdDemandBoostMax,
+          rdHalf: lp.rdHalf ?? p.rdHalf,
+        }).demandModifier,
+      ),
+    )
+  }
+  return productFromRd(game.current.rdStock, p).demandModifier
+}
+
+/** リコールが「引かれた」期の発火率（製品品質が高いほど低い。複数製品は最弱ライン基準）。未設定で 1＝常に発火。 */
 function recallFireRate(game: GameState): number {
   const p = getScenario(game.scenarioId).params
   if (p.recallBaseRate == null) return 1
-  const quality = productFromRd(game.current.rdStock, p).demandModifier
+  const quality = companyQuality(game)
   const qExcess = p.rdDemandBoostMax > 0 ? clamp01((quality - 1) / p.rdDemandBoostMax) : 0
   return clamp01(p.recallBaseRate * (1 - (p.recallQualityShield ?? 0) * qExcess))
 }

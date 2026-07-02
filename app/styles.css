@@ -1277,6 +1277,18 @@ table.history tbody tr[tabindex] {
   }
 }
 
+/* 複数製品: ライン別の判断グループ */
+.line-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.line-group legend {
+  padding: 0 0.35rem;
+}
+
 /* 達成バッジ（実績） */
 .badges {
   display: grid;

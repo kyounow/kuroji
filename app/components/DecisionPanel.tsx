@@ -1,4 +1,4 @@
-import type { Decision } from '@core/index'
+import type { Decision, LineDecision, ProductLineParams } from '@core/index'
 import type { DecisionField } from '@data/scenarios'
 import { yen, pct } from '../format'
 
@@ -54,6 +54,8 @@ interface Props {
   equityIssueCap?: number
   /** 配当: 支払える上限（利益剰余金と現金の小さい方） */
   dividendCap?: number
+  /** 複数製品: ライン定義（2本以上でライン別入力に切替） */
+  productLines?: readonly ProductLineParams[]
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -160,7 +162,30 @@ export function DecisionPanel({
   sharesOutstanding = 0,
   equityIssueCap,
   dividendCap,
+  productLines,
 }: Props) {
+  // 複数製品モード: 製品系5フィールドはライン別に入力し、共通フィールド（保険・設備・雇用・資金…）は従来どおり。
+  const isMultiLine = (productLines?.length ?? 0) > 1
+  const PRODUCT_FIELD_KEYS = new Set<DecisionField>([
+    'unitPrice',
+    'purchaseMaterials',
+    'produceUnits',
+    'marketingSpend',
+    'rdSpend',
+  ])
+  const patchLine = (i: number, p: Partial<LineDecision>) => {
+    const base: LineDecision[] =
+      decision.lines ??
+      (productLines ?? []).map((lp) => ({
+        unitPrice: lp.basePrice,
+        purchaseMaterials: 0,
+        produceUnits: 0,
+        marketingSpend: 0,
+        rdSpend: 0,
+      }))
+    const next = base.map((l, j) => (j === i ? { ...l, ...p } : l))
+    onChange({ lines: next })
+  }
   // 給与水準（相場=100）と離職率。市場賃金は物価指数で連動。
   const marketWage = Math.round(wage * inflationIndex)
   const offeredWage = Math.round(marketWage * (decision.wageLevel / 100))
@@ -180,7 +205,9 @@ export function DecisionPanel({
   const maxMaintRed = maxMaintenanceReduction ?? 0
   const maintenanceReduction = maintRef > 0 ? Math.min(maxMaintRed, decision.maintenanceSpend / maintRef) : 0
   const fullMaintenance = Math.ceil(maintRef * maxMaintRed)
-  const visible = FIELDS.filter((f) => !enabled || enabled.includes(f.key))
+  const visible = FIELDS.filter(
+    (f) => (!enabled || enabled.includes(f.key)) && !(isMultiLine && PRODUCT_FIELD_KEYS.has(f.key)),
+  )
   const capText = Number.isFinite(capacity) ? `${Math.round(capacity).toLocaleString('ja-JP')}個/月` : '無制限'
 
   const labelFor = (f: FieldDef): string => {
@@ -220,6 +247,63 @@ export function DecisionPanel({
       {enabled && (
         <p className="muted small">このシナリオでは基本操作（価格・仕入・生産）に絞っています。慣れたら別シナリオで全機能を。</p>
       )}
+      {isMultiLine &&
+        (productLines ?? []).map((lp, i) => {
+          const line = decision.lines?.[i] ?? {
+            unitPrice: lp.basePrice,
+            purchaseMaterials: 0,
+            produceUnits: 0,
+            marketingSpend: 0,
+            rdSpend: 0,
+          }
+          return (
+            <fieldset key={lp.id} className="choice-group line-group">
+              <legend>🏷 {lp.name}</legend>
+              <div className="fields">
+                <Field
+                  id={`line-${lp.id}-price`}
+                  label="販売価格（単価）"
+                  value={line.unitPrice}
+                  step={100}
+                  onChange={(v) => patchLine(i, { unitPrice: v })}
+                  hint={`基準 ${yen(lp.basePrice)}`}
+                />
+                <Field
+                  id={`line-${lp.id}-buy`}
+                  label="原材料の仕入数量"
+                  value={line.purchaseMaterials}
+                  step={10}
+                  onChange={(v) => patchLine(i, { purchaseMaterials: v })}
+                  hint={`基準原価 ${yen(lp.unitVariableCost)}/個`}
+                />
+                <Field
+                  id={`line-${lp.id}-produce`}
+                  label="生産数量"
+                  value={line.produceUnits}
+                  step={10}
+                  onChange={(v) => patchLine(i, { produceUnits: v })}
+                  hint="能力は全ライン共有（超過分は希望比で按分）"
+                />
+                <Field
+                  id={`line-${lp.id}-mkt`}
+                  label="販促費"
+                  value={line.marketingSpend}
+                  step={10_000}
+                  onChange={(v) => patchLine(i, { marketingSpend: v })}
+                  hint="このラインの需要を押し上げ（逓減）"
+                />
+                <Field
+                  id={`line-${lp.id}-rd`}
+                  label="研究開発費（R&D）"
+                  value={line.rdSpend}
+                  step={10_000}
+                  onChange={(v) => patchLine(i, { rdSpend: v })}
+                  hint="このラインの原価↓・需要↑（翌期以降）。品質は最弱ライン基準"
+                />
+              </div>
+            </fieldset>
+          )
+        })}
       <div className="fields">
         {visible.map((f) => (
           <Field

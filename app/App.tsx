@@ -240,8 +240,12 @@ export function App() {
 
   const warnings = useMemo(() => {
     const w: string[] = []
-    if (Number.isFinite(preview.capacity) && decision.produceUnits > preview.capacity) {
-      w.push(`生産数量 ${num(decision.produceUnits)} が今月の生産能力 ${num(preview.capacity)} を超えています（超過分は作れません）`)
+    // 生産希望の合計（複数製品はライン合算）と共有能力の比較。
+    const totalProduce = decision.lines?.length
+      ? decision.lines.reduce((s, l) => s + Math.max(0, l.produceUnits), 0)
+      : decision.produceUnits
+    if (Number.isFinite(preview.capacity) && totalProduce > preview.capacity) {
+      w.push(`生産数量の合計 ${num(totalProduce)} が今月の生産能力 ${num(preview.capacity)} を超えています（超過分は希望比で按分されます）`)
     }
     if (decision.financing > credit.borrowLimit) {
       w.push(`借入 ${yen(decision.financing)} が借入上限 ${yen(credit.borrowLimit)} を超えています（上限まで自動で制限されます）`)
@@ -253,7 +257,7 @@ export function App() {
       w.push(`この判断だと期末の現金が ${yen(preview.cashFlow.cashEnd)}（マイナス）になり、倒産の恐れがあります`)
     }
     return w
-  }, [preview, decision.produceUnits, decision.financing, decision.equityIssuance, credit.borrowLimit, equityIssueCap])
+  }, [preview, decision.produceUnits, decision.lines, decision.financing, decision.equityIssuance, credit.borrowLimit, equityIssueCap])
 
   // 終了時の診断（なぜ勝った/負けたか＋改善点）。
   const diagnosis = useMemo(() => (gameOver ? diagnoseGame(game) : null), [gameOver, game])
@@ -504,6 +508,34 @@ export function App() {
             </div>
           )}
         </div>
+        {(scenario.params.productLines?.length ?? 0) > 1 && game.current.lines && (
+          <div className="table-scroll">
+            <table className="history">
+              <thead>
+                <tr>
+                  <th>ライン</th>
+                  <th className="r">原材料 在庫</th>
+                  <th className="r">製品 在庫</th>
+                  <th className="r">累積R&D</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scenario.params.productLines!.map((lp, i) => {
+                  const l = game.current.lines![i]
+                  if (!l) return null
+                  return (
+                    <tr key={lp.id}>
+                      <td>{lp.name}</td>
+                      <td className="r">{num(l.materialUnits)}個</td>
+                      <td className="r">{num(l.finishedUnits)}個</td>
+                      <td className="r">{yen(l.rdStock)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
         <p className="muted small">
           原材料を仕入れて在庫し、生産で製品へ。原材料価格は市況で変動（安い時に仕込むと有利）。
           研究開発は実効原価を下げ需要を上げます（逓減・翌期以降に反映）。
@@ -538,6 +570,7 @@ export function App() {
         sharesOutstanding={game.current.sharesOutstanding}
         equityIssueCap={equityIssueCap}
         dividendCap={dividendCap}
+        productLines={scenario.params.productLines}
         warnings={warnings}
       />
 

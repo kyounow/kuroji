@@ -72,6 +72,33 @@ export function ForecastPanel({
         </div>
       </div>
 
+      {preview.lineResults.length > 1 && (
+        <div className="table-scroll">
+          <table className="history">
+            <thead>
+              <tr>
+                <th>ライン</th>
+                <th className="r">見込み需要</th>
+                <th className="r">見込み販売</th>
+                <th className="r">見込み売上</th>
+                <th className="r">売上原価</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.lineResults.map((l) => (
+                <tr key={l.id}>
+                  <td>{l.name}</td>
+                  <td className="r">{num(l.demand)}個</td>
+                  <td className="r">{num(l.unitsSold)}個</td>
+                  <td className="r">{yen(l.revenue)}</td>
+                  <td className="r">{yen(l.costOfGoodsSold)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {sold <= 0 ? (
         <p className="ng small">この価格では売れません（需要0）。販売価格を下げてください。</p>
       ) : be.contributionPerUnit <= 0 ? (
