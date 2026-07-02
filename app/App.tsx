@@ -15,21 +15,15 @@ import {
 } from '@core/index'
 import { useGame, previewTurn, shockRiskFor, defaultDecision } from './state'
 import { EventBanner } from './components/EventBanner'
-import { DecisionPanel } from './components/DecisionPanel'
-import { StatementsView } from './components/StatementsView'
-import { RatiosView } from './components/RatiosView'
-import { HistoryTable } from './components/HistoryTable'
-import { HistoryChart } from './components/HistoryChart'
-import { MacroPanel } from './components/MacroPanel'
-import { ForecastPanel } from './components/ForecastPanel'
-import { CapitalPanel } from './components/CapitalPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SettingsModal } from './components/SettingsModal'
 import { IPOModal } from './components/IPOModal'
 import { AcquisitionModal } from './components/AcquisitionModal'
 import { useGlossary, InfoTip } from './components/Glossary'
-import { LinkageExplainer } from './components/LinkageExplainer'
-import { BadgesPanel } from './components/BadgesPanel'
+import { GameViewProvider, type GameView } from './GameViewContext'
+import { BusinessTab } from './tabs/BusinessTab'
+import { FinanceTab } from './tabs/FinanceTab'
+import { MarketTab } from './tabs/MarketTab'
 import { diagnoseGame } from './diagnosis'
 import { earnedNow } from './badges'
 import { loadBest, saveBest, wasSaveStale, loadBadges, saveBadges } from './storage'
@@ -205,7 +199,6 @@ export function App() {
   // 次の期のショック発生確率リスク（保全水準/品質で低下）。
   const shockRisk = useMemo(() => shockRiskFor(game), [game])
 
-  // この判断の実現性チェック（確定前の警告。倒産・能力/借入枠オーバーを未然に知らせる）。
   // 増資の1期あたり上限（投資家の受け入れ枠＝期首純資産×比率）。
   const equityIssueCap = Math.round(Math.max(0, equity) * (scenario.params.equityIssueCapRatio ?? 0.25))
   // 配当の上限（利益剰余金と現金の小さい方）。
@@ -216,9 +209,7 @@ export function App() {
 
   // IPO: 時価総額（直近1年の純利益×PER）・上場基準・シナリオ開放。
   const ipoVal = useMemo(() => {
-    const annualNI = game.history
-      .slice(-ppy)
-      .reduce((s, h) => s + h.incomeStatement.netIncome, 0)
+    const annualNI = game.history.slice(-ppy).reduce((s, h) => s + h.incomeStatement.netIncome, 0)
     return ipoValuation(annualNI, scenario.params.earningsMultiple ?? 0)
   }, [game.history, ppy, scenario.params.earningsMultiple])
   const ipoGate = useMemo(
@@ -261,6 +252,48 @@ export function App() {
 
   // 終了時の診断（なぜ勝った/負けたか＋改善点）。
   const diagnosis = useMemo(() => (gameOver ? diagnoseGame(game) : null), [gameOver, game])
+
+  // 3タブ共通のビューモデル（Context 配布）。
+  const gameView: GameView = {
+    game,
+    scenario,
+    gameOver,
+    ppy,
+    decision,
+    patch,
+    play,
+    equity,
+    product,
+    spotCost,
+    credit,
+    effectiveRate,
+    capacity,
+    equipCapacity,
+    labCapacity,
+    headcount,
+    hasLabor,
+    equipmentLabel,
+    capacityLabel,
+    preview,
+    warnings,
+    equityIssueCap,
+    dividendCap,
+    hasCompetitor,
+    competitor,
+    ourShare,
+    ipoVal,
+    ipoGate,
+    ipoAllowed,
+    openIpo: () => setIpoOpen(true),
+    maAllowed,
+    openMa: () => setMaOpen(true),
+    selectedTurn,
+    setSelectedTurn,
+    selected,
+    earnedBadges,
+    guideDismissed,
+    dismissGuide,
+  }
 
   return (
     <main className="app">
@@ -346,10 +379,7 @@ export function App() {
             <span className="muted small">{game.goalStatus.detail}</span>
           </div>
           <div className="goal-bar">
-            <div
-              className="goal-fill"
-              style={{ width: `${Math.round(game.goalStatus.progress * 100)}%` }}
-            />
+            <div className="goal-fill" style={{ width: `${Math.round(game.goalStatus.progress * 100)}%` }} />
           </div>
         </section>
       )}
@@ -400,7 +430,7 @@ export function App() {
         role="tablist"
         aria-label="表示を切り替え"
         onKeyDown={(e) => {
-          const i = VIEWS.findIndex((v) => v.key === view)
+          const i = VIEWS.findIndex((vw) => vw.key === view)
           let next = -1
           if (e.key === 'ArrowRight') next = (i + 1) % VIEWS.length
           else if (e.key === 'ArrowLeft') next = (i - 1 + VIEWS.length) % VIEWS.length
@@ -413,315 +443,29 @@ export function App() {
           }
         }}
       >
-        {VIEWS.map((v) => (
+        {VIEWS.map((vw) => (
           <button
-            key={v.key}
-            id={`tab-${v.key}`}
+            key={vw.key}
+            id={`tab-${vw.key}`}
             type="button"
             role="tab"
-            aria-selected={view === v.key}
-            aria-controls={`panel-${v.key}`}
-            tabIndex={view === v.key ? 0 : -1}
-            className={view === v.key ? 'on' : ''}
-            onClick={() => setView(v.key)}
+            aria-selected={view === vw.key}
+            aria-controls={`panel-${vw.key}`}
+            tabIndex={view === vw.key ? 0 : -1}
+            className={view === vw.key ? 'on' : ''}
+            onClick={() => setView(vw.key)}
           >
-            {v.label}
-            <span className="viewtabs-sub">{v.sub}</span>
+            {vw.label}
+            <span className="viewtabs-sub">{vw.sub}</span>
           </button>
         ))}
       </nav>
 
-      {view === 'business' && (
-        <div role="tabpanel" id="panel-business" aria-labelledby="tab-business">
-      {!gameOver && game.history.length === 0 && !guideDismissed && (
-        <section className="guide">
-          <div className="guide-head">
-            <strong>👋 はじめかた（1分でわかる遊び方）</strong>
-            <button className="ghost icon-btn" aria-label="ガイドを閉じる" onClick={dismissGuide}>
-              ✕
-            </button>
-          </div>
-          <ol className="guide-steps">
-            <li>この「事業」タブで<strong>価格・仕入・生産</strong>などを決めます（まずは初期値のままでOK）。</li>
-            <li>下の<strong>「この判断で1期すすめる ▶」</strong>を押すと1ヶ月が経過します。</li>
-            <li>
-              結果は<strong>「財務」タブ</strong>の三表（BS・PL・CF）に反映されます。
-              <strong>倒産せず純資産（黒字）を増やす</strong>のが目標です。
-            </li>
-          </ol>
-        </section>
-      )}
-      <section className="product">
-        <h2>製品・原材料の状態</h2>
-        <div className="product-grid">
-          <div className="metric">
-            <div className="metric-value">{yen(spotCost)}</div>
-            <div className="metric-label">
-              原材料スポット単価/個
-              {(scenario.params.productLines?.length ?? 0) > 1
-                ? `（${scenario.params.productLines![0].name}。他ラインは下表）`
-                : `（基準 ${yen(scenario.params.unitVariableCost)}）`}
-            </div>
-          </div>
-          <div className="metric">
-            <div className="metric-value">{(game.current.materialIndex).toFixed(2)}</div>
-            <div className="metric-label">原材料価格指数（1.0=基準）</div>
-          </div>
-          <div className="metric">
-            <div className="metric-value">{num(game.current.materialUnits)}個</div>
-            <div className="metric-label">原材料 在庫</div>
-          </div>
-          <div className="metric">
-            <div className="metric-value">{num(game.current.finishedUnits)}個</div>
-            <div className="metric-label">製品 在庫</div>
-          </div>
-          <div className="metric">
-            <div className="metric-value">
-              {Number.isFinite(capacity) ? `${num(capacity)}/月` : '無制限'}
-            </div>
-            <div className="metric-label">
-              {capacityLabel}
-              {hasLabor && Number.isFinite(capacity) && (
-                <>（{labCapacity <= equipCapacity ? '人手' : equipmentLabel}が制約）</>
-              )}
-            </div>
-          </div>
-          {hasLabor && (
-            <div className="metric">
-              <div className={`metric-value ${preview.attritionQuits > 0 ? 'ng' : ''}`}>
-                {num(headcount)}人{preview.attritionQuits > 0 ? ` −${preview.attritionQuits}` : ''}
-              </div>
-              <div className="metric-label">
-                従業員（労働能力 {Number.isFinite(labCapacity) ? `${num(labCapacity)}/月` : '—'}・設備{' '}
-                {Number.isFinite(equipCapacity) ? `${num(equipCapacity)}/月` : '無制限'}）
-                {preview.attritionQuits > 0 && (
-                  <span className="ng"> ／ 待遇悪化で {preview.attritionQuits}人 離職見込</span>
-                )}
-              </div>
-            </div>
-          )}
-          <div className="metric">
-            <div className="metric-value">−{pct(1 - product.unitCostModifier)} / +{pct(product.demandModifier - 1)}</div>
-            <div className="metric-label">R&D 原価減 / 需要増</div>
-          </div>
-          <div className="metric">
-            <div className="metric-value">{yen(game.current.rdStock)}</div>
-            <div className="metric-label">累積R&D投資</div>
-          </div>
-          {scenario.params.conditionDecay != null && (
-            <div className="metric">
-              <div className={`metric-value ${(game.current.condition ?? 1) >= 0.6 ? 'ok' : 'ng'}`}>
-                {pct(game.current.condition ?? 1)}
-              </div>
-              <div className="metric-label">設備の整備状態（保全費で維持・故障率に直結）</div>
-            </div>
-          )}
-        </div>
-        {(scenario.params.productLines?.length ?? 0) > 1 && game.current.lines && (
-          <div className="table-scroll">
-            <table className="history">
-              <thead>
-                <tr>
-                  <th>ライン</th>
-                  <th className="r">仕入単価</th>
-                  <th className="r">原材料 在庫</th>
-                  <th className="r">製品 在庫</th>
-                  <th className="r">累積R&D</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scenario.params.productLines!.map((lp, i) => {
-                  const l = game.current.lines![i]
-                  if (!l) return null
-                  return (
-                    <tr key={lp.id}>
-                      <td>{lp.name}</td>
-                      <td className="r">{yen(preview.lineResults[i]?.effectiveUnitCost ?? lp.unitVariableCost)}</td>
-                      <td className="r">{num(l.materialUnits)}個</td>
-                      <td className="r">{num(l.finishedUnits)}個</td>
-                      <td className="r">{yen(l.rdStock)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="muted small">
-          原材料を仕入れて在庫し、生産で製品へ。原材料価格は市況で変動（安い時に仕込むと有利）。
-          研究開発は実効原価を下げ需要を上げます（逓減・翌期以降に反映）。
-        </p>
-      </section>
-
-      <DecisionPanel
-        decision={decision}
-        onChange={patch}
-        onPlay={() => play(decision)}
-        disabled={gameOver}
-        materialUnitCost={spotCost}
-        enabled={scenario.enabledDecisions}
-        creditGrade={credit.grade}
-        borrowLimit={credit.borrowLimit}
-        effectiveRate={effectiveRate}
-        capacity={preview.capacity}
-        capacityLabel={capacityLabel}
-        equipmentLabel={equipmentLabel}
-        insuranceRefCost={scenario.params.insuranceRefCost}
-        maxInsuranceCoverage={scenario.params.maxInsuranceCoverage}
-        maintenanceRefCost={scenario.params.maintenanceRefCost}
-        maxMaintenanceReduction={scenario.params.maxMaintenanceReduction}
-        wage={scenario.params.wage}
-        hireCost={scenario.params.hireCost}
-        severance={scenario.params.severance}
-        headcount={headcount}
-        inflationIndex={game.macro.inflationIndex}
-        attritionSlope={scenario.params.attritionSlope}
-        maxAttrition={scenario.params.maxAttrition}
-        equity={equity}
-        sharesOutstanding={game.current.sharesOutstanding}
-        equityIssueCap={equityIssueCap}
-        dividendCap={dividendCap}
-        productLines={scenario.params.productLines}
-        warnings={warnings}
-      />
-
-      {ipoAllowed && !gameOver && (
-        <section className="panel">
-          <h2>
-            🏛 上場（IPO） <InfoTip term="上場（IPO）" />
-          </h2>
-          <p className="muted small">
-            時価総額（年間純利益×PER{scenario.params.earningsMultiple ?? '—'}）:{' '}
-            <strong>{ipoVal > 0 ? yen(ipoVal) : '—（直近1年が赤字のため算定不可）'}</strong>。 公募で大型調達ができ、
-            知名度で需要も伸びますが、上場維持コストと希薄化を伴います。
-          </p>
-          {ipoGate.ok ? (
-            <div className="actions">
-              <button onClick={() => setIpoOpen(true)}>上場を検討する ▶</button>
-            </div>
-          ) : (
-            <ul className="diagnosis-points muted small">
-              {ipoGate.reasons.map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-
-      {maAllowed && !gameOver && (
-        <section className="panel">
-          <h2>
-            🤝 競合の買収（M&A） <InfoTip term="のれん" />
-          </h2>
-          <p className="muted small">
-            ライバル企業を買収すると、シェアの取り合いが消え、設備 {yen(scenario.params.acqTargetNetAssets ?? 0)}・
-            従業員 {num(scenario.params.acqTargetHeadcount ?? 0)}人・顧客基盤（需要 +
-            {pct(scenario.params.acqTargetDemandBoost ?? 0)}）を受け入れます。 対価が受入純資産を上回る分は
-            <strong>のれん</strong>として資産計上し、毎期償却します。
-          </p>
-          <div className="actions">
-            <button onClick={() => setMaOpen(true)}>買収を検討する ▶</button>
-          </div>
-        </section>
-      )}
-
-      {!gameOver && (
-        <ForecastPanel
-          preview={preview}
-          decision={decision}
-          demandNoise={scenario.params.demandNoise ?? 0}
-        />
-      )}
-        </div>
-      )}
-
-      {view === 'finance' && (
-        <div role="tabpanel" id="panel-finance" aria-labelledby="tab-finance">
-      <HistoryTable
-        history={game.history}
-        selectedTurn={selectedTurn}
-        onSelect={setSelectedTurn}
-        periodsPerYear={ppy}
-      />
-
-      <RatiosView
-        ratios={selected ? selected.ratios : null}
-        turn={selected?.turn}
-        periodsPerYear={ppy}
-      />
-
-      {selected && <LinkageExplainer record={selected} />}
-
-      {game.current.sharesOutstanding != null && game.current.sharesOutstanding > 0 && (
-        <CapitalPanel
-          sharesOutstanding={game.current.sharesOutstanding}
-          equity={equity}
-          lastNetIncome={
-            game.history.length > 0
-              ? game.history[game.history.length - 1].incomeStatement.netIncome
-              : null
-          }
-          listed={game.current.listed === true}
-          marketCap={ipoVal}
-          lastDividendPaid={
-            game.history.length > 0 ? game.history[game.history.length - 1].dividendPaid : undefined
-          }
-        />
-      )}
-
-      <StatementsView
-        state={selected ? selected.stateAfter : game.current}
-        last={selected}
-        periodsPerYear={ppy}
-        history={game.history}
-      />
-
-      <HistoryChart initial={scenario.initialState} history={game.history} />
-
-      <BadgesPanel earned={earnedBadges} />
-        </div>
-      )}
-
-      {view === 'market' && (
-        <div role="tabpanel" id="panel-market" aria-labelledby="tab-market">
-          <MacroPanel macro={game.macro} effectiveRate={effectiveRate} />
-
-          {game.current.acquiredCompetitor ? (
-            <section className="product">
-              <h2>競合・市場シェア</h2>
-              <p className="small">
-                🤝 <strong>競合は買収済みです。</strong>シェアの取り合いはなくなり、獲得した顧客基盤で需要が +
-                {pct(scenario.params.acqTargetDemandBoost ?? 0)} されています。B/S には
-                <strong>のれん</strong>が計上され、毎期償却されています（財務タブ参照）。
-              </p>
-            </section>
-          ) : hasCompetitor ? (
-            <section className="product">
-              <h2>競合・市場シェア</h2>
-              <div className="product-grid">
-                <div className="metric">
-                  <div className="metric-value">{yen(competitor.price)}</div>
-                  <div className="metric-label">競合の価格</div>
-                </div>
-                <div className="metric">
-                  <div className="metric-value">{competitor.quality.toFixed(2)}</div>
-                  <div className="metric-label">競合の品質（自社 {product.demandModifier.toFixed(2)}）</div>
-                </div>
-                <div className="metric">
-                  <div className={`metric-value ${ourShare >= 0.5 ? 'ok' : 'ng'}`}>{pct(ourShare)}</div>
-                  <div className="metric-label">自社シェア（この価格での試算）</div>
-                </div>
-              </div>
-              <p className="muted small">
-                シェアは「価格あたり品質」で競合と取り合います。値下げや研究開発（品質）でシェアが伸び、需要に反映されます。
-              </p>
-            </section>
-          ) : (
-            <p className="muted small">このシナリオには直接の競合はいません（市場を独占的に供給）。</p>
-          )}
-        </div>
-      )}
+      <GameViewProvider value={gameView}>
+        {view === 'business' && <BusinessTab />}
+        {view === 'finance' && <FinanceTab />}
+        {view === 'market' && <MarketTab />}
+      </GameViewProvider>
 
       <footer className="muted small">
         ※ 学習用の簡略モデルです。会計実務や実在企業の財務再現ではありません。 データはこのブラウザ内にのみ保存され、外部送信・追跡はありません。
