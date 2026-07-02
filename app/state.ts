@@ -152,6 +152,7 @@ export function defaultDecision(scenarioId: string): Decision {
     equityIssuance: 0,
     dividend: 0,
     financing: 0,
+    trainingSpend: 0,
     lines,
   }
 }

@@ -91,6 +91,12 @@ export interface CompanyState {
   devInProgress?: DevInProgress[]
   /** ローンチ済みの商材開発（効果有効・無形資産の償却中）。 */
   devLaunched?: DevLaunched[]
+  /**
+   * 従業員（人材開発モデル・params.hr のあるシナリオのみ）。**これが真実源**で、
+   * headcount は employees.length の導出値として毎期書かれる（lines と同じパターン）。
+   * 未保持（従来セーブ）はエンジン入口で headcount 人の等級1現場社員に合成（移行不要）。
+   */
+  employees?: Employee[]
 }
 
 /** 製品ラインの定義（複数製品）。未指定シナリオは従来の単一製品（SimParams 直下の値）で動く。 */
@@ -183,6 +189,80 @@ export interface DevLaunched {
   bookValue: number
 }
 
+/** 従業員の役割。field=現場（労働能力を供給）/ mgmt=管理（チーム効率）/ rnd=研究（毎期R&Dに寄与）。 */
+export type EmployeeRole = 'field' | 'mgmt' | 'rnd'
+
+/**
+ * 従業員（人材開発モデル・hr のあるシナリオのみ）。
+ * スキル = 等級係数 × (1 + 経験の逓減効果)。生産性・品質・定着に効く。
+ * 人件費・研修費はすべて費用処理＝人的資本は B/S に載らない（簿外。開発資産との対比が学び）。
+ */
+export interface Employee {
+  /** 安定ID（採番は既存最大+1。離職・解雇の決定論的選定に使う） */
+  id: number
+  role: EmployeeRole
+  /** 等級（1..）。昇進で上がり、賃金倍率・スキル係数が上がる */
+  grade: number
+  /** 経験（在籍＋研修で蓄積。スキルと昇進資格を規定） */
+  exp: number
+  /** 士気（0..1）。給与・過重労働・研修で変動し、生産性と離職に効く */
+  morale: number
+}
+
+/** 等級の定義（賃金倍率・スキル係数・次の等級への必要経験）。 */
+export interface GradeParams {
+  /** 賃金倍率（基準給与に対する） */
+  wageMult: number
+  /** スキル係数（生産性の基礎倍率） */
+  skillMult: number
+  /** 次の等級へ昇進する必要経験（最上位は未設定） */
+  expToNext?: number
+}
+
+/** 人材開発モデルのパラメータ（未設定のシナリオは従来のスカラー労働モデル）。 */
+export interface HrParams {
+  /** 役割の表示名（例: 職人/班長/技術者） */
+  roleLabels: Record<EmployeeRole, string>
+  /** 等級（index0 = 等級1）。等級1は wageMult=1・skillMult=1 が開始時パリティの前提 */
+  grades: GradeParams[]
+  /** 在籍で毎期積む経験 */
+  expPerTurn: number
+  /** 経験→スキルの上限（例 0.10 = 最大+10%。受動成長は96ヶ月で+5%以内に収める設計） */
+  skillFromExpMax: number
+  /** 経験→スキルの半減点 */
+  expHalf: number
+  /** 研修: 1経験あたりの費用（研修費 ÷ (これ×人数) = 1人あたり経験） */
+  trainingRefCost: number
+  /** 研修: 1期に1人が得られる経験の上限 */
+  trainingExpMax: number
+  /** 中立の士気（開始時・採用時。ここで生産性係数=1＝開始時パリティ） */
+  moraleBase: number
+  /** 士気の自然回復/期 */
+  moraleRecover: number
+  /** 過重労働（希望生産＞能力）の士気低下/期 */
+  moraleOverworkPenalty: number
+  /** 過重労働と判定する超過倍率（希望生産 > 能力×これ。既定1.15＝軽い残業は許容） */
+  overworkThreshold?: number
+  /** 相場割れ給与の士気低下（不足率×これ/期） */
+  moraleWageSlope: number
+  /** 研修実施期の士気上昇 */
+  moraleTrainingBoost: number
+  /** 士気→生産性の傾き（係数 = 1 + これ×(士気−moraleBase)） */
+  moraleProductivitySlope: number
+  /** 低士気→離職率の傾き（士気が floor を下回った分×これ） */
+  attritionMoraleSlope: number
+  /** 離職が始まる士気の下限 */
+  attritionMoraleFloor: number
+  /** 平均スキル超過→需要の微ブースト上限（品質の学び。0で無効） */
+  skillDemandMax?: number
+  /** 管理職のチーム効率ブースト（上限） */
+  mgmtBoost?: number
+  /** 管理職ブーストの半減点（人数） */
+  mgmtHalf?: number
+  /** 研究職1人の年間 R&D 寄与（円換算・ライン0へ） */
+  rndContribPerYear?: number
+}
+
 /** ライン別のターン結果（UI 表示・診断用）。 */
 export interface LineResult {
   id: string
@@ -256,6 +336,10 @@ export interface Decision {
    * 累計が requiredInvestment に達し minTurns を満たすと自動で完成（翌期から効果）。
    */
   devSpend?: Record<string, number>
+  /** 研修投資（人材開発。費用処理＝販管費。従業員の経験・士気を上げる） */
+  trainingSpend?: number
+  /** 役割別の採用（人材開発シナリオ。スカラー hire は現場採用として併用可） */
+  hireRoles?: { field?: number; mgmt?: number; rnd?: number }
 }
 
 /** 市況イベント（需要乗数のほか、突発ショックの損失を持てる）。 */
@@ -388,6 +472,14 @@ export interface TurnResult {
   devAmortized: number
   /** 当期末に完成（翌期から効果）したプロジェクトID */
   launchedProjectIds: string[]
+  /** 人材開発: 期末の平均スキル（hr シナリオのみ。等級×経験×士気を除いた素の値） */
+  hrAvgSkill?: number
+  /** 人材開発: 期末の平均士気（0..1） */
+  hrAvgMorale?: number
+  /** 人材開発: 当期末の昇進人数（人件費が上がるサイン） */
+  hrPromotions?: number
+  /** 人材開発: 当期が過重労働（希望生産＞能力）だったか */
+  hrOverworked?: boolean
   /** 当期に算出された一時損失（保険前 gross。floor/cap/severity 適用後。バナーの見込み額に使う） */
   shockOneOffLoss: number
   /** 当期に算出された設備毀損（保険前 gross。簿価クリップ後。バナーの見込み額に使う） */
@@ -528,6 +620,10 @@ export interface SimParams {
   // --- 商材開発（未指定のシナリオでは開発不可） ---
   /** 開発できる商材プロジェクトの定義。 */
   devProjects?: DevProject[]
+
+  // --- 人材開発（未指定のシナリオは従来のスカラー労働モデル） ---
+  /** 人材開発モデル（従業員個人・等級・研修・士気）。 */
+  hr?: HrParams
 
   // --- M&A（競合の買収。未設定のシナリオでは買収不可） ---
   /** 買収ターゲットの受入純資産（＝受け入れる設備の簿価。対価との差がのれんになる） */

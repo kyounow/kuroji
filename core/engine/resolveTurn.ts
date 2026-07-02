@@ -12,6 +12,8 @@ import type {
   LineResult,
   DevInProgress,
   DevLaunched,
+  Employee,
+  EmployeeRole,
 } from '@core/types'
 import { demandAt } from '@core/market/demand'
 import { productFromRd } from '@core/product/research'
@@ -19,6 +21,15 @@ import { assessCredit } from '@core/finance/credit'
 import { productionCapacity, laborCapacity, costEfficiency } from '@core/finance/capacity'
 import { sharesIssued } from '@core/finance/shares'
 import { composeLineDefs, findDevProject, developmentAssetOf } from '@core/product/dev'
+import {
+  synthesizeEmployees,
+  nextEmployeeId,
+  selectLeavers,
+  hrLaborCapacityPerYear,
+  avgMorale,
+  avgSkill,
+  updateEmployeesEndOfTurn,
+} from '@core/hr/hr'
 
 /** 0..1 にクランプ。 */
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
@@ -64,28 +75,73 @@ export function resolveTurn(
   // 当期の設備投資は当期から有効（期首設備＋当期 capex）。能力・コストに即反映する。
   const opEquipment = bs.fixedAssets.equipment + capex
 
-  // 当期の従業員数（採用・解雇を当期から反映＝即戦力）。人件費・労働能力を規定する。
+  // === 労働（人材開発 hr のあるシナリオは従業員個人モデル・無ければ従来のスカラー） ===
+  // hr モード: employees が真実源（headcount は Σ の導出値）。未保持の従来セーブは
+  // 等級1の現場社員に合成（開始時パリティ＝スキル1・士気中立で従来と同値。移行不要）。
+  const hr = params.hr
+  let employeesWorking: Employee[] | undefined = hr
+    ? (state.employees ?? synthesizeEmployees(state.headcount ?? 0, 'field', hr, 0))
+    : undefined
+
+  // 採用（当期から即戦力）。hr では役割別採用（スカラー hire は現場採用として併用可）。
   const hire = Math.max(0, decision.hire)
-  // 解雇は在籍数（期首＋当期採用）まで。超過指示で存在しない人の退職金を払わないようクランプ。
-  const fire = Math.min(Math.max(0, decision.fire), (state.headcount ?? 0) + hire)
-  const headcountAfterDecision = (state.headcount ?? 0) + hire - fire
+  let hiresTotal = hire
+  if (hr && employeesWorking) {
+    let list = employeesWorking.slice()
+    let nid = nextEmployeeId(list)
+    const roleHires: [EmployeeRole, number][] = [
+      ['field', hire + Math.max(0, Math.round(decision.hireRoles?.field ?? 0))],
+      ['mgmt', Math.max(0, Math.round(decision.hireRoles?.mgmt ?? 0))],
+      ['rnd', Math.max(0, Math.round(decision.hireRoles?.rnd ?? 0))],
+    ]
+    hiresTotal = 0
+    for (const [role, n] of roleHires) {
+      list = list.concat(synthesizeEmployees(n, role, hr, nid))
+      nid += n
+      hiresTotal += n
+    }
+    employeesWorking = list
+  }
+  // 解雇は在籍数（期首＋当期採用）まで。hr では士気の低い順・新しい順に退出（決定論）。
+  const fire = Math.min(
+    Math.max(0, decision.fire),
+    hr && employeesWorking ? employeesWorking.length : (state.headcount ?? 0) + hire,
+  )
+  if (hr && employeesWorking) {
+    employeesWorking = selectLeavers(employeesWorking, fire)[0]
+  }
+  const headcountAfterDecision =
+    hr && employeesWorking ? employeesWorking.length : (state.headcount ?? 0) + hire - fire
   // 給与水準（相場＝物価連動の市場賃金＝1.0）。低いほど人件費は下がるが離職率が上がる。
   const wageMult = Math.max(0, decision.wageLevel) / 100
-  // 自主退職（離職）: 給与水準が相場(1.0)を下回るほど一定割合が離職（退職金なし）。
+  // 自主退職（離職）: 相場割れ ＋（hr）低士気。士気が中立なら hr 項は 0＝開始時パリティ。
   const shortfall = Math.max(0, 1 - wageMult)
-  const quitRate =
+  let quitRate =
     params.attritionSlope != null
       ? Math.min(params.maxAttrition ?? 1, params.attritionSlope * shortfall)
       : 0
+  if (hr && employeesWorking) {
+    const am = avgMorale(employeesWorking, hr)
+    quitRate = Math.min(
+      params.maxAttrition ?? 1,
+      quitRate + hr.attritionMoraleSlope * Math.max(0, hr.attritionMoraleFloor - am),
+    )
+  }
   // 浮動小数の丸め境界（例 0.5）を安定して切り上げるため微小εを加える。
   const attritionQuits = Math.round(headcountAfterDecision * quitRate + 1e-9)
-  const headcount = Math.max(0, headcountAfterDecision - attritionQuits)
+  if (hr && employeesWorking) {
+    employeesWorking = selectLeavers(employeesWorking, attritionQuits)[0]
+  }
+  const headcount =
+    hr && employeesWorking ? employeesWorking.length : Math.max(0, headcountAfterDecision - attritionQuits)
 
   // 当期の生産能力＝設備能力と労働能力の小さい方（設備か人手のボトルネック）。全ライン共有。
-  const capacity = Math.min(
-    productionCapacity(opEquipment, params, periodFactor),
-    laborCapacity(headcount, params, periodFactor),
-  )
+  // hr は現場のスキル×士気×管理職のチーム効率で個人単位に積み上げ（中立で従来と同値）。
+  const laborCap =
+    hr && employeesWorking && params.laborPerHead
+      ? Math.floor(hrLaborCapacityPerYear(employeesWorking, params.laborPerHead, hr) * periodFactor)
+      : laborCapacity(headcount, params, periodFactor)
+  const capacity = Math.min(productionCapacity(opEquipment, params, periodFactor), laborCap)
 
   // 期首残高
   const cashBegin = bs.currentAssets.cash
@@ -181,10 +237,15 @@ export function resolveTurn(
   const shareMultiplier = options.demandShareMultiplier ?? 1
   // 需要ブレ（確定時のみ。プレビューは未指定＝1で中心値）。実際の販売に不確実性を持たせる。
   const demandNoise = options.demandNoise ?? 1
-  // 全社レベルの需要乗数（上場の知名度・買収した顧客基盤）。単一の適用点で全ラインに掛ける。
+  // 全社レベルの需要乗数（上場の知名度・買収した顧客基盤・（hr）熟練による品質）。単一の適用点で全ラインに掛ける。
+  const hrSkillExcess =
+    hr && employeesWorking && hr.skillFromExpMax > 0
+      ? Math.min(1, Math.max(0, (avgSkill(employeesWorking, hr) - 1) / hr.skillFromExpMax))
+      : 0
   const companyDemandMultiplier =
     (state.listed ? 1 + (params.listingDemandBoost ?? 0) : 1) *
-    (state.acquiredCompetitor ? 1 + (params.acqTargetDemandBoost ?? 0) : 1)
+    (state.acquiredCompetitor ? 1 + (params.acqTargetDemandBoost ?? 0) : 1) *
+    (1 + (hr?.skillDemandMax ?? 0) * hrSkillExcess)
 
   const linesEnd: ProductLineState[] = []
   const lineResults: LineResult[] = []
@@ -252,6 +313,14 @@ export function resolveTurn(
     marketingSpendTotal += Math.max(0, w.dec.marketingSpend)
     rdSpendTotal += Math.max(0, w.dec.rdSpend)
   })
+  // （hr）研究職の R&D 寄与: 毎期ライン0の rdStock に加算（Σ(lines)=rdStock の不変条件を保ったまま）。
+  if (hr && employeesWorking && hr.rndContribPerYear && linesEnd.length > 0) {
+    const rndCount = employeesWorking.filter((e) => e.role === 'rnd').length
+    if (rndCount > 0) {
+      const contrib = Math.round(hr.rndContribPerYear * rndCount * periodFactor)
+      linesEnd[0] = { ...linesEnd[0], rdStock: linesEnd[0].rdStock + contrib }
+    }
+  }
   // 全社集計（B/S・在庫Δに使う。スカラーの materialUnits 等は以後 Σ(lines) の導出値として書く）
   const rawUnitsEnd = linesEnd.reduce((s, l) => s + l.materialUnits, 0)
   const rawValEnd = linesEnd.reduce((s, l) => s + l.materialValue, 0)
@@ -325,10 +394,23 @@ export function resolveTurn(
   const insuranceSpend = Math.max(0, decision.insuranceSpend)
   const maintenanceSpend = Math.max(0, decision.maintenanceSpend)
   // 人件費＝従業員数 × 市場賃金(wage×物価指数) × 給与水準。未設定の wage は労働モデル無効＝0。
+  // hr は等級別の賃金倍率で個人単位に積み上げ（全員等級1なら従来と同値＝昇進で自然に人件費が上がる）。
   const laborCost = params.wage
-    ? Math.round(headcount * params.wage * inflationIndex * wageMult * periodFactor)
+    ? hr && employeesWorking
+      ? Math.round(
+          employeesWorking.reduce(
+            (s, e) => s + params.wage! * (hr.grades[Math.min(e.grade, hr.grades.length) - 1]?.wageMult ?? 1),
+            0,
+          ) *
+            inflationIndex *
+            wageMult *
+            periodFactor,
+        )
+      : Math.round(headcount * params.wage * inflationIndex * wageMult * periodFactor)
     : 0
-  const hiringCost = hire * (params.hireCost ?? 0)
+  const hiringCost = hiresTotal * (params.hireCost ?? 0)
+  // 研修費（hr のみ。費用処理＝販管費。人的資本は B/S に載らない＝開発資産との対比が学び）。
+  const trainingSpend = hr ? Math.max(0, Math.round(decision.trainingSpend ?? 0)) : 0
   const severanceCost = fire * (params.severance ?? 0)
   // 上場維持コスト（監査・IR・ガバナンス）。上場中は毎期かかる固定的費用（年額を期間スケール・物価連動）。
   const listingCostNow =
@@ -351,7 +433,8 @@ export function resolveTurn(
     listingCostNow +
     goodwillAmort +
     devExpensed + // 費用処理の開発費（カフェのメニュー等）
-    devAmortized // 開発資産の償却（非現金・営業CFで足し戻す）
+    devAmortized + // 開発資産の償却（非現金・営業CFで足し戻す）
+    trainingSpend // 研修費（hr・費用処理）
   const operatingIncome = grossProfit - operatingExpenses
 
   // 実効金利＝政策金利（マクロ）＋銀行スプレッド＋信用スプレッド（期首の財務状態で評価）。
@@ -530,6 +613,28 @@ export function resolveTurn(
         )
       : (state.condition ?? 1)
 
+  // === （hr）期末の従業員更新: 経験・士気・昇進。過重労働＝「希望生産＞能力」（能力以上を求め続けると疲弊）。
+  // 士気は state 経由で翌期の生産性・離職に効く（整備状態 condition と同じ翌期反映パターン＝循環なし）。
+  const hrOverworked =
+    hr != null && Number.isFinite(capacity) && totalWant > capacity * (hr.overworkThreshold ?? 1.15)
+  let employeesEnd: Employee[] | undefined
+  let hrPromotions = 0
+  if (hr && employeesWorking) {
+    const upd = updateEmployeesEndOfTurn(employeesWorking, hr, {
+      trainingSpend,
+      overworked: hrOverworked,
+      wageShortfall: shortfall,
+    })
+    employeesEnd = upd.employees
+    hrPromotions = upd.promotions
+    // M&A で受け入れた人員は期末に合流（等級1・中立士気の現場として）。
+    if (acqHeads > 0) {
+      employeesEnd = employeesEnd.concat(
+        synthesizeEmployees(acqHeads, 'field', hr, nextEmployeeId(employeesEnd)),
+      )
+    }
+  }
+
   // --- 期末の貸借対照表（B/S）と状態 ---
   const nextState: CompanyState = {
     turn: state.turn + 1,
@@ -541,7 +646,9 @@ export function resolveTurn(
     lines: linesEnd,
     condition: conditionNext,
     // 買収で受け入れた人員は期末に合流（翌期から人件費・労働能力に反映）。
-    headcount: headcount + acqHeads,
+    // hr では employees が真実源で headcount は Σ の導出値。
+    headcount: hr && employeesEnd ? employeesEnd.length : headcount + acqHeads,
+    employees: hr ? employeesEnd : undefined,
     // 株式が未設定のシナリオ（チュートリアル等）は未設定のまま保つ（後方互換）。
     sharesOutstanding:
       state.sharesOutstanding == null && newShares === 0 && ipoShares === 0 && acqStockShares === 0
@@ -616,6 +723,10 @@ export function resolveTurn(
     devExpensed,
     devAmortized,
     launchedProjectIds,
+    hrAvgSkill: hr && employeesEnd ? avgSkill(employeesEnd, hr) : undefined,
+    hrAvgMorale: hr && employeesEnd ? avgMorale(employeesEnd, hr) : undefined,
+    hrPromotions: hr ? hrPromotions : undefined,
+    hrOverworked: hr ? hrOverworked : undefined,
     lineResults,
     shockOneOffLoss: oneOffLoss,
     shockEquipmentWritedown: equipmentWritedown,

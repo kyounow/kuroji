@@ -56,6 +56,8 @@ interface Props {
   dividendCap?: number
   /** 複数製品: ライン定義（2本以上でライン別入力に切替） */
   productLines?: readonly ProductLineParams[]
+  /** 人材開発シナリオでは 採用/解雇 を人材・組織パネルに移す（このパネルからは隠す） */
+  hrEnabled?: boolean
 }
 
 /** 数値入力（ラベル付き）。 */
@@ -163,6 +165,7 @@ export function DecisionPanel({
   equityIssueCap,
   dividendCap,
   productLines,
+  hrEnabled = false,
 }: Props) {
   // 複数製品モード: 製品系5フィールドはライン別に入力し、共通フィールド（保険・設備・雇用・資金…）は従来どおり。
   const isMultiLine = (productLines?.length ?? 0) > 1
@@ -210,8 +213,13 @@ export function DecisionPanel({
   const maxMaintRed = maxMaintenanceReduction ?? 0
   const maintenanceReduction = maintRef > 0 ? Math.min(maxMaintRed, decision.maintenanceSpend / maintRef) : 0
   const fullMaintenance = Math.ceil(maintRef * maxMaintRed)
+  // 人材開発シナリオでは 採用/解雇 を人材・組織パネルへ移す（役割別採用・士気と一緒に判断するため）。
+  const HR_MOVED_KEYS = new Set<DecisionField>(['hire', 'fire'])
   const visible = FIELDS.filter(
-    (f) => (!enabled || enabled.includes(f.key)) && !(isMultiLine && PRODUCT_FIELD_KEYS.has(f.key)),
+    (f) =>
+      (!enabled || enabled.includes(f.key)) &&
+      !(isMultiLine && PRODUCT_FIELD_KEYS.has(f.key)) &&
+      !(hrEnabled && HR_MOVED_KEYS.has(f.key)),
   )
   const capText = Number.isFinite(capacity) ? `${Math.round(capacity).toLocaleString('ja-JP')}個/月` : '無制限'
 

@@ -1,6 +1,7 @@
 import { useGameView } from '../GameViewContext'
 import { DecisionPanel } from '../components/DecisionPanel'
 import { DevPanel } from '../components/DevPanel'
+import { HrPanel } from '../components/HrPanel'
 import { ForecastPanel } from '../components/ForecastPanel'
 import { InfoTip } from '../components/Glossary'
 import { yen, pct, num } from '../format'
@@ -168,8 +169,11 @@ export function BusinessTab() {
         equityIssueCap={v.equityIssueCap}
         dividendCap={v.dividendCap}
         productLines={v.lineDefs.length > 1 ? v.lineDefs : undefined}
+        hrEnabled={params.hr != null}
         warnings={v.warnings}
       />
+
+      {params.hr != null && <HrPanel />}
 
       {(params.devProjects?.length ?? 0) > 0 && <DevPanel />}
 

@@ -18,6 +18,10 @@ export type {
   DevProject,
   DevInProgress,
   DevLaunched,
+  Employee,
+  EmployeeRole,
+  GradeParams,
+  HrParams,
   Goal,
   GoalStatus,
 } from './types'
@@ -32,6 +36,17 @@ export { bookValuePerShare, sharesIssued, earningsPerShare } from './finance/sha
 export { ipoValuation, ipoOfferPrice, canIPO, type IpoGate } from './finance/ipo'
 export { productFromRd } from './product/research'
 export { composeLineDefs, devLifecycleFactor, findDevProject, developmentAssetOf } from './product/dev'
+export {
+  calcSkill,
+  moraleFactor,
+  synthesizeEmployees,
+  nextEmployeeId,
+  hrLaborCapacityPerYear,
+  avgMorale,
+  avgSkill,
+  selectLeavers,
+  updateEmployeesEndOfTurn,
+} from './hr/hr'
 export { materialIndexNext } from './market/material'
 export { competitorAt, shareMultiplier, marketShare, type Competitor } from './market/competitor'
 export {

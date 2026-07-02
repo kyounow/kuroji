@@ -90,7 +90,20 @@ function checkRecord(
       }
     }
   }
-  // 8) 商材開発: 開発資産は Σ(資産計上WIP)＋Σ(残存簿価) の導出値・WIPは必要額以内・簿価は非負
+  // 8) 人材開発: headcount は Σ(employees) の導出値・士気/等級/経験の範囲・ID一意
+  if (params?.hr) {
+    const emps = s.employees ?? []
+    if ((s.headcount ?? 0) !== emps.length) p.push(`${ctx}: headcount≠employees.length`)
+    const ids = new Set<number>()
+    for (const e of emps) {
+      if (e.morale < 0 || e.morale > 1) p.push(`${ctx}: 士気が0..1外`)
+      if (e.grade < 1 || e.grade > params.hr.grades.length) p.push(`${ctx}: 等級が範囲外`)
+      if (e.exp < 0) p.push(`${ctx}: 経験<0`)
+      if (ids.has(e.id)) p.push(`${ctx}: 従業員ID重複`)
+      ids.add(e.id)
+    }
+  }
+  // 9) 商材開発: 開発資産は Σ(資産計上WIP)＋Σ(残存簿価) の導出値・WIPは必要額以内・簿価は非負
   if (params?.devProjects?.length) {
     const expectAsset = developmentAssetOf(params, s)
     if ((bs.fixedAssets.developmentAsset ?? 0) !== expectAsset) p.push(`${ctx}: 開発資産≠Σ(WIP+簿価)`)
@@ -163,6 +176,16 @@ function randomDecision(game: GameState, params: SimParams, seed: number, turn: 
           ]),
         )
       : undefined,
+    // 人材開発（研修・役割別採用の経路をストレス。過重労働・昇進・離職は生産/給与の乱数から自然に発生）。
+    trainingSpend: params.hr && (sink || u(seed, turn, 70) < 0.3) ? Math.round(60000 * u(seed, turn, 71)) : 0,
+    hireRoles:
+      params.hr && sink && u(seed, turn, 72) < 0.25
+        ? {
+            field: Math.floor(2 * u(seed, turn, 73)),
+            mgmt: u(seed, turn, 74) < 0.3 ? 1 : 0,
+            rnd: u(seed, turn, 75) < 0.3 ? 1 : 0,
+          }
+        : undefined,
   }
 }
 

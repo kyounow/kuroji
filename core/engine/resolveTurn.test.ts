@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { CompanyState, Decision, SimParams } from '@core/types'
+import type { CompanyState, Decision, SimParams, HrParams } from '@core/types'
 import { balances, totalAssets, totalLiabilities, totalEquity } from '@core/statements/identity'
 import { resolveTurn, marketingMultiplier } from './resolveTurn'
 
@@ -21,6 +21,32 @@ const decide = (d: Partial<Decision> = {}): Decision => ({
   financing: 0,
   ...d,
 })
+
+// 人材開発テスト用の中立パラメータ（等級1= wageMult1/skillMult1・中立士気＝開始時パリティが前提）。
+const HR_NEUTRAL: HrParams = {
+  roleLabels: { field: '職人', mgmt: '班長', rnd: '技術者' },
+  grades: [
+    { wageMult: 1, skillMult: 1, expToNext: 36 },
+    { wageMult: 1.25, skillMult: 1.15, expToNext: 96 },
+    { wageMult: 1.5, skillMult: 1.3 },
+  ],
+  expPerTurn: 1,
+  skillFromExpMax: 0.1,
+  expHalf: 96,
+  trainingRefCost: 3_000,
+  trainingExpMax: 6,
+  moraleBase: 0.6,
+  moraleRecover: 0.05,
+  moraleOverworkPenalty: 0.08,
+  moraleWageSlope: 0.3,
+  moraleTrainingBoost: 0.03,
+  moraleProductivitySlope: 0.5,
+  attritionMoraleSlope: 0.5,
+  attritionMoraleFloor: 0.35,
+  mgmtBoost: 0.2,
+  mgmtHalf: 2,
+  rndContribPerYear: 60_000,
+}
 
 // テスト用の安定した基準（シナリオの再バランスに影響されない大きめの設定。
 // 生産能力キャップは未設定＝無制限なので、生産数量はそのまま反映される）。
@@ -614,6 +640,129 @@ describe('resolveTurn（原材料インベントリ・発生主義モデル）',
     expect(r.state.devLaunched?.[0].bookValue).toBe(230_000)
     expect(r.state.balanceSheet.fixedAssets.developmentAsset).toBe(230_000)
     expect(r.incomeStatement.operatingExpenses - noDev.incomeStatement.operatingExpenses).toBe(10_000)
+    expect(balances(r.state.balanceSheet)).toBe(true)
+  })
+
+  it('人材開発: 開始時パリティ（等級1・経験0・中立士気で従来スカラーと同一の人件費・能力・結果）', () => {
+    const { initialState, params } = base()
+    const hrParams: SimParams = { ...params, laborPerHead: 120, wage: 14_000, hr: HR_NEUTRAL }
+    const scalarParams: SimParams = { ...params, laborPerHead: 120, wage: 14_000 }
+    const state: CompanyState = { ...initialState, headcount: 5 }
+    const a = resolveTurn(state, decide({ produceUnits: 50, purchaseMaterials: 50 }), hrParams)
+    const b = resolveTurn(state, decide({ produceUnits: 50, purchaseMaterials: 50 }), scalarParams)
+    expect(a.incomeStatement.operatingExpenses).toBe(b.incomeStatement.operatingExpenses)
+    expect(a.incomeStatement.netIncome).toBe(b.incomeStatement.netIncome)
+    expect(a.capacity).toBe(b.capacity)
+    expect(a.state.headcount).toBe(5)
+    expect(a.state.employees).toHaveLength(5) // スカラー→従業員へ合成
+    expect(a.state.employees?.every((e) => e.grade === 1 && e.role === 'field')).toBe(true)
+    expect(balances(a.state.balanceSheet)).toBe(true)
+  })
+
+  it('人材開発: 研修は費用処理で経験・士気を上げ、翌期以降の能力が伸びる', () => {
+    const { initialState, params } = base()
+    const p: SimParams = { ...params, laborPerHead: 120, wage: 14_000, hr: HR_NEUTRAL }
+    const state: CompanyState = { ...initialState, headcount: 5 }
+    const trained = resolveTurn(state, decide({ produceUnits: 0, trainingSpend: 45_000 }), p)
+    const idle = resolveTurn(state, decide({ produceUnits: 0 }), p)
+    // 費用処理: 販管費に研修費が乗る
+    expect(trained.incomeStatement.operatingExpenses - idle.incomeStatement.operatingExpenses).toBe(45_000)
+    // 経験: 在籍1 + 研修 45,000/(3,000×5)=3 → 4
+    expect(trained.state.employees?.[0].exp).toBe(4)
+    expect(trained.state.employees?.[0].morale).toBeCloseTo(HR_NEUTRAL.moraleBase + HR_NEUTRAL.moraleTrainingBoost, 6)
+    // 翌期の労働能力はスキル分伸びる（研修あり > なし）
+    const nextTrained = resolveTurn(trained.state, decide({ produceUnits: 0 }), p)
+    const nextIdle = resolveTurn(idle.state, decide({ produceUnits: 0 }), p)
+    expect(nextTrained.hrAvgSkill ?? 0).toBeGreaterThan(nextIdle.hrAvgSkill ?? 0)
+    expect(balances(trained.state.balanceSheet)).toBe(true)
+  })
+
+  it('人材開発: 昇進で等級と人件費が上がる（昇給）', () => {
+    const { initialState, params } = base()
+    const p: SimParams = { ...params, laborPerHead: 120, wage: 14_000, hr: HR_NEUTRAL }
+    const nearPromo: CompanyState = {
+      ...initialState,
+      headcount: 1,
+      employees: [{ id: 0, role: 'field', grade: 1, exp: 35, morale: HR_NEUTRAL.moraleBase }],
+    }
+    const r = resolveTurn(nearPromo, decide({ produceUnits: 0 }), p)
+    expect(r.hrPromotions).toBe(1)
+    expect(r.state.employees?.[0].grade).toBe(2)
+    // 翌期の人件費は wageMult 1.25 倍
+    const next = resolveTurn(r.state, decide({ produceUnits: 0 }), p)
+    const base1 = resolveTurn(
+      { ...nearPromo, employees: [{ id: 0, role: 'field', grade: 1, exp: 0, morale: HR_NEUTRAL.moraleBase }] },
+      decide({ produceUnits: 0 }),
+      p,
+    )
+    expect(next.incomeStatement.operatingExpenses).toBeGreaterThan(base1.incomeStatement.operatingExpenses)
+  })
+
+  it('人材開発: 過重労働（希望生産＞能力）で士気が下がり、低士気は離職を生む（決定論）', () => {
+    const { initialState, params } = base()
+    const p: SimParams = { ...params, laborPerHead: 120, capacityPerEquipment: undefined, wage: 14_000, hr: HR_NEUTRAL }
+    const state: CompanyState = { ...initialState, headcount: 5, materialUnits: 2_000 }
+    // 能力 5×120/12=50 に対し 200 を要求 → 過重労働
+    const over = resolveTurn(state, decide({ produceUnits: 200, purchaseMaterials: 0 }), p)
+    expect(over.hrOverworked).toBe(true)
+    expect(over.hrAvgMorale ?? 1).toBeLessThan(HR_NEUTRAL.moraleBase)
+    // 低士気チームは離職が出る（士気の低い順・同率は新しい順に退出＝決定論）
+    // 平均士気 0.1 → 離職率 = 0.5×(0.35−0.1) = 0.125 → 4人×0.125 = 0.5 → 1人
+    const lowMorale: CompanyState = {
+      ...initialState,
+      headcount: 4,
+      employees: [
+        { id: 0, role: 'field', grade: 1, exp: 0, morale: 0.05 },
+        { id: 1, role: 'field', grade: 1, exp: 0, morale: 0.05 },
+        { id: 2, role: 'field', grade: 1, exp: 0, morale: 0.1 },
+        { id: 3, role: 'field', grade: 1, exp: 0, morale: 0.2 },
+      ],
+    }
+    const quit = resolveTurn(lowMorale, decide({ produceUnits: 0 }), p)
+    expect(quit.attritionQuits).toBe(1)
+    // 去るのは最低士気・同率なら新しい方（id 1）
+    expect(quit.state.employees?.map((e) => e.id)).toEqual([0, 2, 3])
+    expect(quit.state.headcount).toBe(quit.state.employees?.length)
+  })
+
+  it('人材開発: 役割 — 管理職は能力を押し上げ、研究職は毎期 R&D に寄与する', () => {
+    const { initialState, params } = base()
+    const p: SimParams = { ...params, laborPerHead: 120, capacityPerEquipment: undefined, wage: 14_000, hr: HR_NEUTRAL }
+    const mixed: CompanyState = {
+      ...initialState,
+      headcount: 6,
+      employees: [
+        ...[0, 1, 2, 3].map((id) => ({ id, role: 'field' as const, grade: 1, exp: 0, morale: 0.6 })),
+        { id: 10, role: 'mgmt' as const, grade: 1, exp: 0, morale: 0.6 },
+        { id: 11, role: 'rnd' as const, grade: 1, exp: 0, morale: 0.6 },
+      ],
+    }
+    const r = resolveTurn(mixed, decide({ produceUnits: 0 }), p)
+    // 現場4×120/12=40 × 管理職ブースト(1+0.2×1/3)=1.0667 → floor(42.67)=42
+    expect(r.capacity).toBe(42)
+    // 研究職の寄与: rdStock 60,000/年 → 5,000/月
+    expect(r.state.rdStock - initialState.rdStock).toBe(5_000)
+    expect(r.state.lines?.reduce((s, l) => s + l.rdStock, 0)).toBe(r.state.rdStock)
+  })
+
+  it('人材開発: M&A の受け入れ人員は従業員として合流し、headcount=Σemployees を保つ', () => {
+    const { initialState, params } = base()
+    const p: SimParams = {
+      ...params,
+      laborPerHead: 120,
+      wage: 14_000,
+      hr: HR_NEUTRAL,
+      acqTargetNetAssets: 500_000,
+      acqTargetHeadcount: 3,
+    }
+    const state: CompanyState = { ...initialState, headcount: 5, sharesOutstanding: 1_000 }
+    const r = resolveTurn(
+      state,
+      decide({ produceUnits: 0, acquire: { cashPaid: 800_000, debtRaised: 0, stockValue: 0 } }),
+      p,
+    )
+    expect(r.state.employees).toHaveLength(8)
+    expect(r.state.headcount).toBe(8)
     expect(balances(r.state.balanceSheet)).toBe(true)
   })
 

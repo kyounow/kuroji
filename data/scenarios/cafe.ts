@@ -74,6 +74,32 @@ export const cafeScenario: Scenario = {
     rdCostReductionMax: 0.2,
     rdDemandBoostMax: 0.6,
     rdHalf: 200_000,
+    // 人材開発（接客と回転。研修の効果が早く出るが、若いスタッフは離職しやすい）
+    hr: {
+      roleLabels: { field: 'スタッフ', mgmt: '店長', rnd: 'シェフ' },
+      grades: [
+        { wageMult: 1, skillMult: 1, expToNext: 18 }, // 半人前→ベテランは1年半
+        { wageMult: 1.2, skillMult: 1.2, expToNext: 60 },
+        { wageMult: 1.45, skillMult: 1.45 },
+      ],
+      expPerTurn: 1,
+      skillFromExpMax: 0.1,
+      expHalf: 96,
+      trainingRefCost: 600, // 接客研修は手頃で効きが早い
+      trainingExpMax: 8,
+      moraleBase: 0.6,
+      moraleRecover: 0.05,
+      moraleOverworkPenalty: 0.09,
+      moraleWageSlope: 0.35,
+      moraleTrainingBoost: 0.04,
+      moraleProductivitySlope: 0.5,
+      attritionMoraleSlope: 0.6,
+      attritionMoraleFloor: 0.4, // 若年で離職しやすい
+      skillDemandMax: 0.06, // 接客品質が客足を微押し上げ
+      mgmtBoost: 0.2,
+      mgmtHalf: 1, // 店長1人で効きやすい小さな組織
+      rndContribPerYear: 30_000, // シェフのメニュー研究
+    },
     // 商材開発（カフェ＝メニュー開発。レシピは資産にならない＝費用処理。製造/ITの資産計上との対比が学び）
     devProjects: [
       {

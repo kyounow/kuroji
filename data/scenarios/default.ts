@@ -91,6 +91,32 @@ export const defaultScenario: Scenario = {
     listingDemandBoost: 0.12, // 上場の知名度で需要+12%（能力を広げてこそ効く＝再投資の学び）
     ipoEquityThreshold: 1_000_000, // 純資産100万円以上
     ipoProfitablePeriods: 6, // 直近6ヶ月連続黒字
+    // 人材開発（職人の熟練。等級1は倍率1＝開始時は従来と同値で、育成すると強く・高くなる）
+    hr: {
+      roleLabels: { field: '職人', mgmt: '班長', rnd: '技術者' },
+      grades: [
+        { wageMult: 1, skillMult: 1, expToNext: 36 }, // 見習い→一人前は3年
+        { wageMult: 1.25, skillMult: 1.25, expToNext: 96 },
+        { wageMult: 1.5, skillMult: 1.5 },
+      ],
+      expPerTurn: 1,
+      skillFromExpMax: 0.1, // 受動成長は96ヶ月で+5%以内（研修が差を作る）
+      expHalf: 96,
+      trainingRefCost: 800, // 研修費 800円で1人1経験（ROI: 昇進まで~1年・投資は2年内に回収）
+      trainingExpMax: 6,
+      moraleBase: 0.6,
+      moraleRecover: 0.05,
+      moraleOverworkPenalty: 0.08, // 希望生産＞能力が続くと士気↓
+      moraleWageSlope: 0.3,
+      moraleTrainingBoost: 0.03,
+      moraleProductivitySlope: 0.5,
+      attritionMoraleSlope: 0.5,
+      attritionMoraleFloor: 0.35,
+      skillDemandMax: 0.05, // 熟練の品質が需要を微押し上げ
+      mgmtBoost: 0.2,
+      mgmtHalf: 2,
+      rndContribPerYear: 60_000, // 技術者1人＝年6万円ぶんの R&D
+    },
     // 商材開発（開発費の資産計上→無形資産→償却 を学ぶ。製造業＝新製品と設計改良）
     devProjects: [
       {

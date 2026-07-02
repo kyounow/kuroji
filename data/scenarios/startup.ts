@@ -76,6 +76,32 @@ export const startupScenario: Scenario = {
     listingDemandBoost: 0.15, // 上場の知名度で需要+15%
     ipoEquityThreshold: 1_000_000,
     ipoProfitablePeriods: 6,
+    // 人材開発（エンジニアが価値の源泉。高給・待遇に敏感・研修は高価だが効く）
+    hr: {
+      roleLabels: { field: 'エンジニア', mgmt: 'リード', rnd: 'R&D担当' },
+      grades: [
+        { wageMult: 1, skillMult: 1, expToNext: 24 }, // 成長が速い業界
+        { wageMult: 1.3, skillMult: 1.3, expToNext: 72 },
+        { wageMult: 1.7, skillMult: 1.7 },
+      ],
+      expPerTurn: 1,
+      skillFromExpMax: 0.1,
+      expHalf: 96,
+      trainingRefCost: 2_500, // 技術研修は相対的に高い
+      trainingExpMax: 6,
+      moraleBase: 0.6,
+      moraleRecover: 0.05,
+      moraleOverworkPenalty: 0.1, // 過重労働に敏感
+      moraleWageSlope: 0.5, // 待遇に敏感
+      moraleTrainingBoost: 0.04,
+      moraleProductivitySlope: 0.6,
+      attritionMoraleSlope: 0.7, // 流動性が高い
+      attritionMoraleFloor: 0.4,
+      skillDemandMax: 0.08,
+      mgmtBoost: 0.25,
+      mgmtHalf: 2,
+      rndContribPerYear: 150_000, // R&D担当は主戦場
+    },
     // 商材開発（IT＝ソフトウェアの資産計上→速い償却・速い陳腐化）
     devProjects: [
       {
